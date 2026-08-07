@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Panel | Touring Buddiez</title>
+<link rel="icon" href="../assets/logo/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+<link rel="stylesheet" href="../css/tokens.css">
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<!-- ===================== LOGIN ===================== -->
+<div id="login-screen">
+  <div class="login-card">
+    <img src="../assets/logo/logo.png" alt="Touring Buddiez">
+    <h1>Touring Buddiez</h1>
+    <p>Admin Panel</p>
+    <form id="login-form">
+      <div class="field">
+        <label for="login-username">Username</label>
+        <input type="text" id="login-username" placeholder="admin" autocomplete="username" required>
+      </div>
+      <div class="field">
+        <label for="login-password">Password</label>
+        <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" required>
+      </div>
+      <button type="submit" class="btn-primary" id="login-btn">Sign In</button>
+      <p id="login-error" class="error-msg" style="display:none"></p>
+    </form>
+  </div>
+</div>
+
+<!-- ===================== APP ===================== -->
+<div id="app" style="display:none">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <img src="../assets/logo/logo.png" alt="logo">
+      <div>
+        <div class="sidebar-title">Touring Buddiez</div>
+        <div class="sidebar-sub">Admin Panel</div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-item active" data-section="dashboard">
+        <i class="fa-solid fa-gauge-high"></i><span>Dashboard</span>
+      </a>
+      <a href="#" class="nav-item" data-section="packages">
+        <i class="fa-solid fa-map-location-dot"></i><span>Packages</span>
+      </a>
+      <a href="#" class="nav-item" data-section="bookings">
+        <i class="fa-solid fa-calendar-check"></i><span>Bookings</span>
+        <span id="bookings-pending-badge" class="nav-badge" style="display:none"></span>
+      </a>
+      <a href="#" class="nav-item" data-section="enquiries">
+        <i class="fa-solid fa-envelope"></i><span>Enquiries</span>
+        <span id="enquiries-new-badge" class="nav-badge" style="display:none"></span>
+      </a>
+      <a href="#" class="nav-item" data-section="rentals">
+        <i class="fa-solid fa-car-side"></i><span>Rentals</span>
+      </a>
+      <a href="#" class="nav-item" data-section="gallery">
+        <i class="fa-solid fa-images"></i><span>Gallery</span>
+      </a>
+      <a href="#" class="nav-item" data-section="testimonials">
+        <i class="fa-solid fa-quote-left"></i><span>Testimonials</span>
+        <span id="testimonials-pending-badge" class="nav-badge" style="display:none"></span>
+      </a>
+      <a href="#" class="nav-item" data-section="settings">
+        <i class="fa-solid fa-gear"></i><span>Site Settings</span>
+      </a>
+      <a href="#" class="nav-item" data-section="account">
+        <i class="fa-solid fa-lock"></i><span>Change Password</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <a href="../" target="_blank" class="sidebar-link"><i class="fa-solid fa-arrow-up-right-from-square"></i> View Website</a>
+      <button id="logout-btn" class="sidebar-link"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
+    </div>
+  </aside>
+
+  <div class="main-wrapper">
+    <header class="topbar">
+      <button class="burger-btn" id="sidebar-toggle"><i class="fa-solid fa-bars"></i></button>
+      <div class="topbar-title" id="topbar-title">Dashboard</div>
+      <div class="topbar-user"><i class="fa-solid fa-circle-user"></i> <span id="topbar-username">admin</span></div>
+    </header>
+
+    <main class="main-content">
+
+      <!-- ── DASHBOARD ── -->
+      <section id="section-dashboard" class="section active">
+        <div class="section-head">
+          <h2>Dashboard</h2>
+          <p>Overview of your website content</p>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon"><i class="fa-solid fa-map-location-dot"></i></div>
+            <div class="stat-info"><b id="stat-packages">–</b><span>Tour Packages</span></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon"><i class="fa-solid fa-calendar-check"></i></div>
+            <div class="stat-info"><b id="stat-bookings">–</b><span>Total Bookings</span></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon"><i class="fa-solid fa-envelope"></i></div>
+            <div class="stat-info"><b id="stat-enquiries">–</b><span>Total Enquiries</span></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon"><i class="fa-solid fa-car-side"></i></div>
+            <div class="stat-info"><b id="stat-rentals">–</b><span>Rental Vehicles</span></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon"><i class="fa-solid fa-images"></i></div>
+            <div class="stat-info"><b id="stat-gallery">–</b><span>Gallery Photos</span></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon"><i class="fa-solid fa-quote-left"></i></div>
+            <div class="stat-info"><b id="stat-testimonials">–</b><span>Approved Reviews</span></div>
+          </div>
+        </div>
+
+        <div class="dash-panel">
+          <div class="dash-panel-head">
+            <h3>Bookings — last 30 days</h3>
+            <span id="stat-most-booked" class="dash-panel-note"></span>
+          </div>
+          <div id="bookings-chart" class="bar-chart"></div>
+        </div>
+
+        <div class="quick-actions">
+          <h3>Quick Actions</h3>
+          <div class="action-grid">
+            <button class="action-btn" onclick="showSection('packages'); setTimeout(openPackageForm, 100)">
+              <i class="fa-solid fa-plus"></i> Add New Package
+            </button>
+            <button class="action-btn" onclick="showSection('gallery')">
+              <i class="fa-solid fa-upload"></i> Upload Gallery Photos
+            </button>
+            <button class="action-btn" onclick="showSection('rentals'); setTimeout(openRentalForm, 100)">
+              <i class="fa-solid fa-plus"></i> Add Rental Vehicle
+            </button>
+            <button class="action-btn" onclick="showSection('settings')">
+              <i class="fa-solid fa-gear"></i> Edit Site Settings
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── PACKAGES ── -->
+      <section id="section-packages" class="section">
+        <div class="section-head">
+          <div>
+            <h2>Tour Packages</h2>
+            <p>Add, edit or remove tour packages shown on the website</p>
+          </div>
+          <button class="btn-primary" onclick="openPackageForm()"><i class="fa-solid fa-plus"></i> Add Package</button>
+        </div>
+        <div class="table-wrap">
+          <table id="packages-table">
+            <thead>
+              <tr>
+                <th>Image</th>
+                <th>Name</th>
+                <th>Route</th>
+                <th>Duration</th>
+                <th>Featured</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="packages-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ── BOOKINGS ── -->
+      <section id="section-bookings" class="section">
+        <div class="section-head">
+          <div>
+            <h2>Bookings</h2>
+            <p>Trip booking requests submitted from package pages. New requests start as "pending" until you confirm them.</p>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Status</th>
+                <th>Name</th>
+                <th>Contact</th>
+                <th>Package</th>
+                <th>Travel Date</th>
+                <th>Group</th>
+                <th>Submitted</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="bookings-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ── ENQUIRIES ── -->
+      <section id="section-enquiries" class="section">
+        <div class="section-head">
+          <div>
+            <h2>Enquiries</h2>
+            <p>Every contact-form submission from the site — saved here even if the visitor never sent the WhatsApp message.</p>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Status</th>
+                <th>Name</th>
+                <th>Contact</th>
+                <th>Message</th>
+                <th>Submitted</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="enquiries-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ── RENTALS ── -->
+      <section id="section-rentals" class="section">
+        <div class="section-head">
+          <div>
+            <h2>Rental Vehicles</h2>
+            <p>Manage the vehicle fleet shown on the website</p>
+          </div>
+          <button class="btn-primary" onclick="openRentalForm()"><i class="fa-solid fa-plus"></i> Add Vehicle</button>
+        </div>
+        <div class="table-wrap">
+          <table id="rentals-table">
+            <thead>
+              <tr>
+                <th>Image</th>
+                <th>Name</th>
+                <th>Seats</th>
+                <th>Tags</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="rentals-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ── GALLERY ── -->
+      <section id="section-gallery" class="section">
+        <div class="section-head">
+          <div>
+            <h2>Gallery</h2>
+            <p>Upload and manage photos shown in the gallery section</p>
+          </div>
+          <button class="btn-primary" onclick="openGalleryUpload()"><i class="fa-solid fa-upload"></i> Upload Photos</button>
+        </div>
+        <div class="gallery-admin-grid" id="gallery-grid"></div>
+      </section>
+
+      <!-- ── TESTIMONIALS ── -->
+      <section id="section-testimonials" class="section">
+        <div class="section-head">
+          <div>
+            <h2>Testimonials</h2>
+            <p>Real reviews submitted by visitors on the site. Nothing shows up publicly until you approve it here.</p>
+          </div>
+          <button class="btn-primary" onclick="openTestimonialForm()"><i class="fa-solid fa-plus"></i> Log a Review</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Status</th>
+                <th>Name</th>
+                <th>Package</th>
+                <th>Rating</th>
+                <th>Quote</th>
+                <th>Submitted</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="testimonials-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ── SETTINGS ── -->
+      <section id="section-settings" class="section">
+        <div class="section-head">
+          <h2>Site Settings</h2>
+          <p>Update contact details and homepage statistics</p>
+        </div>
+        <form id="settings-form" class="settings-form">
+          <div class="settings-group">
+            <h3><i class="fa-solid fa-phone"></i> Contact Details</h3>
+            <div class="field-row">
+              <div class="field">
+                <label for="fld-phone">Display Phone Number</label>
+                <input id="fld-phone" type="text" name="phone" placeholder="+91 60028 16370">
+              </div>
+              <div class="field">
+                <label for="fld-phone_raw">Phone (raw, no spaces/+)</label>
+                <input id="fld-phone_raw" type="text" name="phone_raw" placeholder="916002816370">
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="fld-whatsapp">WhatsApp Number (raw)</label>
+                <input id="fld-whatsapp" type="text" name="whatsapp" placeholder="916002816370">
+              </div>
+              <div class="field">
+                <label for="fld-instagram">Instagram Handle</label>
+                <input id="fld-instagram" type="text" name="instagram" placeholder="touring_buddiez">
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="fld-facebook">Facebook URL</label>
+                <input id="fld-facebook" type="text" name="facebook" placeholder="#">
+              </div>
+              <div class="field">
+                <label for="fld-base_location">Base Location</label>
+                <input id="fld-base_location" type="text" name="base_location" placeholder="Guwahati, Assam">
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <h3><i class="fa-solid fa-chart-simple"></i> Homepage Statistics</h3>
+            <div class="field-row">
+              <div class="field">
+                <label for="fld-stat_destinations">Destinations Covered</label>
+                <input id="fld-stat_destinations" type="number" name="stat_destinations" placeholder="12">
+              </div>
+              <div class="field">
+                <label for="fld-stat_travelers">Travelers Guided</label>
+                <input id="fld-stat_travelers" type="number" name="stat_travelers" placeholder="800">
+              </div>
+              <div class="field">
+                <label for="fld-stat_years">Founded Year</label>
+                <input id="fld-stat_years" type="number" name="stat_years" placeholder="2025">
+              </div>
+              <div class="field">
+                <label for="fld-stat_rating">Average Rating (e.g. 4.9)</label>
+                <input id="fld-stat_rating" type="text" name="stat_rating" placeholder="4.9">
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <h3><i class="fa-solid fa-circle-info"></i> Site Info</h3>
+            <div class="field">
+              <label for="fld-site_description">Site Description (footer)</label>
+              <textarea id="fld-site_description" name="site_description" rows="2" placeholder="Curated tours..."></textarea>
+            </div>
+          </div>
+
+          <button type="submit" class="btn-primary"><i class="fa-solid fa-floppy-disk"></i> Save Settings</button>
+          <p id="settings-msg" class="success-msg" style="display:none"></p>
+        </form>
+      </section>
+
+      <!-- ── ACCOUNT ── -->
+      <section id="section-account" class="section">
+        <div class="section-head">
+          <h2>Change Password</h2>
+          <p>Update your admin login password</p>
+        </div>
+        <form id="password-form" class="settings-form" style="max-width:480px">
+          <div class="field">
+            <label for="cur-pass">Current Password</label>
+            <input type="password" id="cur-pass" placeholder="Current password" required>
+          </div>
+          <div class="field">
+            <label for="new-pass">New Password</label>
+            <input type="password" id="new-pass" placeholder="New password (min 6 chars)" required>
+          </div>
+          <div class="field">
+            <label for="conf-pass">Confirm New Password</label>
+            <input type="password" id="conf-pass" placeholder="Confirm new password" required>
+          </div>
+          <button type="submit" class="btn-primary"><i class="fa-solid fa-lock"></i> Change Password</button>
+          <p id="pass-msg" style="display:none; margin-top:1rem; font-weight:600"></p>
+        </form>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- ===================== MODAL ===================== -->
+<div id="modal-overlay" style="display:none">
+  <div id="modal">
+    <div class="modal-header">
+      <h3 id="modal-title">Modal</h3>
+      <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<!-- ===================== TOAST ===================== -->
+<div id="toast" style="display:none"></div>
+
+<script src="admin.js"></script>
+</body>
+</html>

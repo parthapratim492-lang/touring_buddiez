@@ -1,0 +1,110 @@
+/* ==========================================================================
+   TOURING BUDDIEZ v2 — DESIGN TOKENS
+   Every color, type size, spacing unit and motion curve used site-wide
+   is declared once here. Nothing below should hardcode a hex value.
+   ========================================================================== */
+
+:root{
+
+  /* ---- Palette -----------------------------------------------------------
+     Inspired by Meghalaya's living root bridges and monsoon forest cover:
+     deep pine, misty overcast light, and the brass of monastery bells and
+     prayer-wheel trim. No cream/terracotta, no neon-on-black defaults. */
+
+  --ink:            #0B1D15;   /* near-black pine, darkest surface        */
+  --forest-900:     #0F2A1F;
+  --forest-800:     #163829;   /* primary brand green                     */
+  --forest-700:     #1E4A36;
+  --forest-600:     #2C5B44;
+  --forest-500:     #3E7259;
+
+  --mist-050:       #F3F6F1;   /* page background, cool sage-white        */
+  --mist-100:       #E9EEE6;
+  --paper:          #FCFDFB;   /* card surfaces                           */
+
+  --brass-400:      #E4C583;   /* light gold, for text-on-dark            */
+  --brass-500:      #C79A44;   /* primary accent                          */
+  --brass-600:      #A87C31;
+
+  --rust-500:       #A4472F;   /* rare, third accent — badges/alerts only */
+
+  --slate-700:      #2B342E;   /* body text on light                      */
+  --slate-500:      #5A665D;   /* secondary text on light                 */
+  --slate-300:      #93A199;   /* muted / placeholders                    */
+
+  --line-light:      rgba(22,56,41,0.12);
+  --line-dark:        rgba(228,197,131,0.18);
+
+  /* ---- Typography ---------------------------------------------------------
+     Fraunces  — display, carries personality (used with restraint)
+     Inter     — body/UI, quiet workhorse
+     IBM Plex Mono — coordinates, day-tags, prices, eyebrows */
+
+  --font-display: 'Fraunces', 'Georgia', serif;
+  --font-body:    'Inter', -apple-system, sans-serif;
+  --font-mono:    'IBM Plex Mono', monospace;
+
+  --fs-2xs:  0.72rem;
+  --fs-xs:   0.8125rem;
+  --fs-sm:   0.9375rem;
+  --fs-md:   1.0625rem;
+  --fs-lg:   1.25rem;
+  --fs-xl:   1.75rem;
+  --fs-2xl:  2.5rem;
+  --fs-3xl:  3.4rem;
+  --fs-4xl:  4.6rem;
+
+  --lh-tight: 1.05;
+  --lh-snug:  1.25;
+  --lh-body:  1.65;
+
+  /* ---- Spacing scale (8px base) ------------------------------------------ */
+  --sp-1:  0.5rem;
+  --sp-2:  0.75rem;
+  --sp-3:  1rem;
+  --sp-4:  1.5rem;
+  --sp-5:  2rem;
+  --sp-6:  3rem;
+  --sp-7:  4.5rem;
+  --sp-8:  6.5rem;
+  --sp-9:  9rem;
+
+  /* ---- Shape / elevation -------------------------------------------------- */
+  --radius-sm:  8px;
+  --radius-md:  16px;
+  --radius-lg:  28px;
+  --radius-pill: 999px;
+
+  --shadow-sm: 0 2px 10px rgba(11,29,21,0.06);
+  --shadow-md: 0 12px 32px rgba(11,29,21,0.12);
+  --shadow-lg: 0 30px 60px -20px rgba(11,29,21,0.35);
+  --shadow-brass-glow: 0 0 0 1px rgba(199,154,68,0.35), 0 20px 40px -18px rgba(199,154,68,0.45);
+
+  /* ---- Motion -------------------------------------------------------------- */
+  --ease-out:      cubic-bezier(.16,.84,.44,1);
+  --ease-in-out:   cubic-bezier(.65,0,.35,1);
+  --ease-spring:   cubic-bezier(.34,1.56,.64,1);
+
+  --dur-fast:  180ms;
+  --dur-med:   420ms;
+  --dur-slow:  800ms;
+
+  /* ---- Layout --------------------------------------------------------------- */
+  --container-w: 1240px;
+  --nav-h: 84px;
+  --nav-h-scrolled: 68px;
+
+  --z-nav: 500;
+  --z-cursor: 900;
+  --z-loader: 1000;
+  --z-lightbox: 800;
+}
+
+@media (prefers-reduced-motion: reduce){
+  *{
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

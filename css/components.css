@@ -1,0 +1,432 @@
+/* ==========================================================================
+   TOURING BUDDIEZ v2 — COMPONENT LIBRARY
+   Reusable, brand-consistent building blocks. Pages should compose these
+   rather than writing one-off styles.
+   ========================================================================== */
+
+/* ---------- Reset & base -------------------------------------------------- */
+*, *::before, *::after{ margin:0; padding:0; box-sizing:border-box; }
+html{ scroll-behavior:smooth; }
+body{
+  font-family: var(--font-body);
+  background: var(--mist-050);
+  color: var(--slate-700);
+  line-height: var(--lh-body);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+img{ max-width:100%; display:block; }
+a{ text-decoration:none; color:inherit; }
+ul{ list-style:none; }
+button, input, textarea, select{ font-family:inherit; font-size:inherit; color:inherit; }
+button{ cursor:pointer; border:none; background:none; }
+svg{ display:block; }
+
+h1,h2,h3,h4{ font-family: var(--font-display); line-height: var(--lh-tight); font-weight:600; color: var(--ink); }
+
+::selection{ background: var(--brass-500); color: var(--ink); }
+
+:focus-visible{
+  outline: 2px solid var(--brass-500);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.container{
+  width: 100%;
+  max-width: var(--container-w);
+  margin-inline: auto;
+  padding-inline: var(--sp-5);
+}
+
+/* ---------- Section heading pattern ---------------------------------------
+   eyebrow (mono, tracked-out) + Fraunces title. Used identically across
+   every section so rhythm reads consistent top-to-bottom. */
+.section-head{
+  max-width: 640px;
+  margin-bottom: var(--sp-6);
+}
+.section-head.centered{ margin-inline:auto; text-align:center; }
+.eyebrow{
+  display:inline-flex;
+  align-items:center;
+  gap: .6em;
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--brass-600);
+  margin-bottom: var(--sp-2);
+}
+.eyebrow::before{
+  content:"";
+  width: 22px; height: 1px;
+  background: var(--brass-500);
+  display:inline-block;
+}
+.section-head.centered .eyebrow{ justify-content:center; }
+.section-head.centered .eyebrow::before{ display:none; }
+.section-head h2{
+  font-size: var(--fs-3xl);
+  letter-spacing: -0.01em;
+}
+.section-head p{
+  margin-top: var(--sp-3);
+  color: var(--slate-500);
+  font-size: var(--fs-md);
+  max-width: 52ch;
+}
+.section-head.centered p{ margin-inline:auto; }
+.on-dark h2, .on-dark .eyebrow, .on-dark p{ color: var(--mist-050); }
+.on-dark .eyebrow{ color: var(--brass-400); }
+.on-dark p{ color: rgba(243,246,241,0.7); }
+
+/* ---------- Buttons --------------------------------------------------------- */
+.btn{
+  position:relative;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap: .55em;
+  padding: 1em 1.9em;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  letter-spacing: .01em;
+  border-radius: var(--radius-pill);
+  overflow:hidden;
+  isolation:isolate;
+  transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), background var(--dur-fast);
+  white-space:nowrap;
+}
+.btn:active{ transform: scale(.97); }
+
+.btn-primary{
+  background: var(--brass-500);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+}
+.btn-primary:hover{ background: var(--brass-400); box-shadow: var(--shadow-brass-glow); transform: translateY(-2px); }
+
+.btn-dark{
+  background: var(--forest-800);
+  color: var(--mist-050);
+}
+.btn-dark:hover{ background: var(--forest-700); transform: translateY(-2px); box-shadow: var(--shadow-md); }
+
+.btn-ghost{
+  background: transparent;
+  color: inherit;
+  border: 1.5px solid var(--line-light);
+}
+.on-dark .btn-ghost{ border-color: var(--line-dark); color: var(--mist-050); }
+.btn-ghost:hover{ border-color: var(--brass-500); background: rgba(199,154,68,0.08); }
+
+.btn-sm{ padding: .8em 1.5em; font-size: var(--fs-xs); }
+
+/* ripple element injected by JS */
+.btn .ripple{
+  position:absolute;
+  border-radius:50%;
+  transform: scale(0);
+  background: rgba(255,255,255,0.5);
+  pointer-events:none;
+  animation: ripple 650ms var(--ease-out);
+  z-index:-1;
+}
+.btn-ghost .ripple, .btn-dark .ripple{ background: rgba(199,154,68,0.35); }
+@keyframes ripple{ to{ transform: scale(3.2); opacity:0; } }
+
+/* ---------- Cards ------------------------------------------------------------ */
+.card{
+  background: var(--paper);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--dur-med) var(--ease-out), transform var(--dur-med) var(--ease-out);
+}
+
+/* 3D tilt wrapper — JS toggles --rx/--ry custom props on mousemove */
+.tilt{
+  --rx: 0deg; --ry: 0deg;
+  transform: perspective(900px) rotateX(var(--rx)) rotateY(var(--ry)) translateZ(0);
+  transition: transform var(--dur-med) var(--ease-out), box-shadow var(--dur-med) var(--ease-out);
+  will-change: transform;
+}
+.tilt:hover{ box-shadow: var(--shadow-lg); }
+
+/* image zoom-on-hover, used inside package/vehicle/gallery cards */
+.media-zoom{ overflow:hidden; position:relative; }
+.media-zoom img{
+  transition: transform var(--dur-slow) var(--ease-out), filter var(--dur-slow);
+  transform: scale(1.001);
+}
+.media-zoom:hover img{ transform: scale(1.09); }
+
+/* ---------- Glassmorphism -------------------------------------------------- */
+.glass{
+  background: rgba(252,253,251,0.08);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid rgba(255,255,255,0.14);
+}
+.glass-light{
+  background: rgba(252,253,251,0.72);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid rgba(22,56,41,0.08);
+}
+
+/* ---------- Badges ----------------------------------------------------------- */
+.badge{
+  display:inline-flex;
+  align-items:center;
+  gap:.4em;
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  letter-spacing:.05em;
+  padding: .5em .9em;
+  border-radius: var(--radius-pill);
+  background: var(--ink);
+  color: var(--brass-400);
+}
+
+/* ---------- Navigation --------------------------------------------------------- */
+.nav{
+  position: fixed;
+  top:0; left:0; right:0;
+  z-index: var(--z-nav);
+  height: var(--nav-h);
+  display:flex;
+  align-items:center;
+  transition: height var(--dur-med) var(--ease-out), background var(--dur-med), box-shadow var(--dur-med), border-color var(--dur-med);
+  border-bottom: 1px solid transparent;
+}
+.nav .container{ display:flex; align-items:center; justify-content:space-between; gap: var(--sp-4); }
+.nav.is-scrolled{
+  height: var(--nav-h-scrolled);
+  background: rgba(11,29,21,0.82);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border-bottom-color: rgba(228,197,131,0.14);
+  box-shadow: var(--shadow-md);
+}
+.nav-logo{ display:flex; align-items:center; gap:.7em; }
+.nav-logo img{ height:38px; width:38px; border-radius:50%; }
+.nav-logo span{
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  color: var(--mist-050);
+  font-weight:600;
+  letter-spacing:-.01em;
+}
+.nav-links{ display:flex; align-items:center; gap: var(--sp-5); }
+.nav-links a{
+  position:relative;
+  font-size: var(--fs-xs);
+  letter-spacing:.03em;
+  color: rgba(243,246,241,0.82);
+  padding: .3em 0;
+  transition: color var(--dur-fast);
+}
+.nav-links a::after{
+  content:"";
+  position:absolute; left:0; bottom:-4px;
+  width:0; height:1.5px;
+  background: var(--brass-500);
+  transition: width var(--dur-med) var(--ease-out);
+}
+.nav-links a:hover{ color: var(--mist-050); }
+.nav-links a:hover::after, .nav-links a.active::after{ width:100%; }
+.nav-actions{ display:flex; align-items:center; gap: var(--sp-3); }
+
+.nav-burger{
+  display:none;
+  flex-direction:column;
+  gap:5px;
+  width:26px;
+  z-index: 600;
+}
+.nav-burger span{
+  height:2px; width:100%;
+  background: var(--mist-050);
+  transition: transform var(--dur-med) var(--ease-spring), opacity var(--dur-fast);
+}
+.nav-burger.is-open span:nth-child(1){ transform: translateY(7px) rotate(45deg); }
+.nav-burger.is-open span:nth-child(2){ opacity:0; }
+.nav-burger.is-open span:nth-child(3){ transform: translateY(-7px) rotate(-45deg); }
+
+.mobile-menu{
+  position:fixed; inset:0;
+  background: var(--ink);
+  z-index: 480;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  gap: var(--sp-5);
+  transform: translateY(-100%);
+  transition: transform var(--dur-slow) var(--ease-in-out);
+}
+.mobile-menu.is-open{ transform: translateY(0); }
+.mobile-menu a{
+  font-family: var(--font-display);
+  font-size: var(--fs-2xl);
+  color: var(--mist-050);
+}
+.mobile-menu a:hover{ color: var(--brass-500); }
+
+/* ---------- Footer -------------------------------------------------------------- */
+.footer{
+  background: var(--ink);
+  color: rgba(243,246,241,0.65);
+  padding-block: var(--sp-8) var(--sp-5);
+  position:relative;
+  overflow:hidden;
+}
+.footer-grid{
+  display:grid;
+  grid-template-columns: 1.4fr 1fr 1fr 1.2fr;
+  gap: var(--sp-6);
+  padding-bottom: var(--sp-7);
+  border-bottom: 1px solid var(--line-dark);
+}
+.footer-brand img{ height:44px; width:44px; border-radius:50%; margin-bottom: var(--sp-3); }
+.footer-brand p{ max-width:32ch; font-size: var(--fs-sm); }
+.footer h4{
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color: var(--brass-400);
+  margin-bottom: var(--sp-3);
+}
+.footer ul li{ margin-bottom:.7em; font-size: var(--fs-sm); }
+.footer ul a{ transition: color var(--dur-fast); }
+.footer ul a:hover{ color: var(--brass-400); }
+.footer-social{ display:flex; gap:.7em; margin-top: var(--sp-3); }
+.footer-social a{
+  width:38px; height:38px;
+  display:flex; align-items:center; justify-content:center;
+  border-radius:50%;
+  border:1px solid var(--line-dark);
+  transition: background var(--dur-fast), border-color var(--dur-fast), transform var(--dur-fast);
+}
+.footer-social a:hover{ background: var(--brass-500); color: var(--ink); border-color: var(--brass-500); transform: translateY(-3px); }
+.footer-bottom{
+  display:flex; align-items:center; justify-content:space-between;
+  padding-top: var(--sp-4);
+  font-size: var(--fs-2xs);
+  flex-wrap:wrap; gap: var(--sp-2);
+}
+
+/* ---------- Forms ----------------------------------------------------------------- */
+.field{
+  display:flex; flex-direction:column; gap:.5em;
+  margin-bottom: var(--sp-4);
+}
+.field label{ font-size: var(--fs-xs); letter-spacing:.03em; color: var(--slate-500); }
+.field input, .field select, .field textarea{
+  padding: .95em 1.1em;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--line-light);
+  background: var(--paper);
+  transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+}
+.field input:focus, .field select:focus, .field textarea:focus{
+  border-color: var(--brass-500);
+  box-shadow: 0 0 0 4px rgba(199,154,68,0.15);
+  outline:none;
+}
+.field textarea{ resize: vertical; min-height:110px; }
+.field-row{ display:grid; grid-template-columns:1fr 1fr; gap: var(--sp-3); }
+
+/* ---------- Scroll reveal ----------------------------------------------------------- */
+[data-reveal]{
+  opacity:0;
+  transform: translateY(28px);
+  transition: opacity 900ms var(--ease-out), transform 900ms var(--ease-out);
+}
+[data-reveal].is-visible{ opacity:1; transform:none; }
+[data-reveal-delay="1"]{ transition-delay: 90ms; }
+[data-reveal-delay="2"]{ transition-delay: 180ms; }
+[data-reveal-delay="3"]{ transition-delay: 270ms; }
+[data-reveal-delay="4"]{ transition-delay: 360ms; }
+
+/* ---------- Woven divider (signature motif) ------------------------------------------
+   A hand-woven interlace referencing Meghalaya's living root bridges.
+   Used to separate major bands instead of a plain hairline. */
+.woven-divider{
+  width:100%;
+  height:34px;
+  display:block;
+}
+.woven-divider path{
+  fill:none;
+  stroke: var(--line-light);
+  stroke-width:1.4;
+}
+.on-dark .woven-divider path{ stroke: var(--line-dark); }
+
+/* ---------- Utility ------------------------------------------------------------------- */
+.eyebrow-dot{ width:5px; height:5px; border-radius:50%; background: var(--brass-500); display:inline-block; }
+.text-center{ text-align:center; }
+.mono{ font-family: var(--font-mono); }
+
+/* ---------- Subpage hero ---------------------------------------------------------------
+   Compact header banner for interior pages (packages, destination detail pages) that
+   don't need the full video hero. Same brand language, smaller footprint. */
+.subpage-hero{
+  position:relative;
+  margin-top: var(--nav-h);
+  min-height: 320px;
+  display:flex;
+  align-items:flex-end;
+  overflow:hidden;
+  background: var(--forest-800);
+}
+.subpage-hero img{
+  position:absolute; inset:0;
+  width:100%; height:100%;
+  object-fit:cover;
+  opacity:.55;
+}
+.subpage-hero::after{
+  content:"";
+  position:absolute; inset:0;
+  background: linear-gradient(180deg, rgba(11,29,21,.35) 0%, rgba(11,29,21,.75) 100%);
+}
+.subpage-hero-content{
+  position:relative;
+  z-index:1;
+  padding-block: var(--sp-6) var(--sp-5);
+  color: var(--mist-050);
+}
+.subpage-breadcrumb{
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  color: var(--brass-400);
+  margin-bottom: var(--sp-2);
+  display:flex;
+  gap:.5em;
+  align-items:center;
+}
+.subpage-breadcrumb a{ color:inherit; opacity:.75; transition: opacity var(--dur-fast) var(--ease-out); }
+.subpage-breadcrumb a:hover{ opacity:1; }
+.subpage-hero-content h1{
+  color: var(--mist-050);
+  font-size: clamp(2rem, 4vw, var(--fs-3xl));
+  max-width: 720px;
+}
+.subpage-hero-content p{
+  margin-top: var(--sp-2);
+  max-width: 560px;
+  color: rgba(243,246,241,0.78);
+  font-size: var(--fs-md);
+}
+
+/* ---------- Empty / loading state (shared) --------------------------------------------- */
+.state-empty{
+  text-align:center;
+  padding: var(--sp-7) var(--sp-4);
+  color: var(--slate-500);
+  font-size: var(--fs-sm);
+}
