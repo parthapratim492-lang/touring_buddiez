@@ -429,6 +429,14 @@
             </div>
           ` : ''}
 
+          <div class="pkg-availability-section">
+            <h2>Availability</h2>
+            <p class="pkg-availability-intro">Dates shown in red are already blocked — everything else is open. Get in touch to lock in your preferred dates.</p>
+            <div id="pkg-availability-calendar" class="pkg-availability-calendar">
+              <div class="pkg-route-map-loading"><i class="fa-solid fa-spinner fa-spin"></i> Checking availability&hellip;</div>
+            </div>
+          </div>
+
           ${incl.length ? `
             <h2>What's Usually Included</h2>
             <div class="pkg-inclusions-grid">
@@ -474,6 +482,68 @@
         stops: stops
       });
     }
+
+    renderAvailabilityCalendar(pkg.slug);
+  }
+
+  async function renderAvailabilityCalendar(slug) {
+    const el = document.getElementById('pkg-availability-calendar');
+    if (!el) return;
+    const blocks = await fetchJSON(`/api/packages/${encodeURIComponent(slug)}/availability`);
+
+    // Build a fast lookup of blocked YYYY-MM-DD strings from each [start, end] range.
+    const blockedDates = new Set();
+    const blockedReasons = new Map();
+    (blocks || []).forEach((b) => {
+      const start = new Date(b.start_date + 'T00:00:00');
+      const end = new Date(b.end_date + 'T00:00:00');
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const key = d.toISOString().slice(0, 10);
+        blockedDates.add(key);
+        if (b.reason) blockedReasons.set(key, b.reason);
+      }
+    });
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    function buildMonth(monthOffset) {
+      const first = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
+      const monthLabel = first.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+      const startWeekday = first.getDay(); // 0 = Sunday
+      const daysInMonth = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+
+      let cells = '';
+      for (let i = 0; i < startWeekday; i++) cells += '<span class="pkg-avail-cell is-empty"></span>';
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dateObj = new Date(first.getFullYear(), first.getMonth(), day);
+        const key = dateObj.toISOString().slice(0, 10);
+        const isPast = dateObj < today;
+        const isBlocked = blockedDates.has(key);
+        const reason = blockedReasons.get(key);
+        const cls = isPast ? 'is-past' : (isBlocked ? 'is-blocked' : 'is-open');
+        const title = isBlocked && reason ? ` title="${esc(reason)}"` : '';
+        cells += `<span class="pkg-avail-cell ${cls}"${title}>${day}</span>`;
+      }
+
+      return `
+        <div class="pkg-avail-month">
+          <h4>${monthLabel}</h4>
+          <div class="pkg-avail-weekdays">
+            <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
+          </div>
+          <div class="pkg-avail-grid">${cells}</div>
+        </div>
+      `;
+    }
+
+    el.innerHTML = `
+      <div class="pkg-avail-months">${buildMonth(0)}${buildMonth(1)}</div>
+      <div class="pkg-avail-legend">
+        <span><i class="pkg-avail-dot is-open"></i> Open</span>
+        <span><i class="pkg-avail-dot is-blocked"></i> Blocked</span>
+      </div>
+    `;
   }
 
   // ─── Run ───────────────────────────────────────────────────────────────────

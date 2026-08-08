@@ -529,4 +529,17 @@
     initReviewForm();
     initContactForm();
   });
+
+  /* ---------------------------------------------------------------------
+     PWA — service worker registration
+     Registered from every page (not just index.html) so the app is
+     installable no matter where a visitor lands first.
+  --------------------------------------------------------------------- */
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch(() => {
+        // Silent — a failed SW registration shouldn't break the page.
+      });
+    });
+  }
 })();

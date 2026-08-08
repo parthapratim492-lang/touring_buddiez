@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Admin Panel | Touring Buddiez</title>
 <link rel="icon" href="../assets/logo/logo.png">
+<link rel="manifest" href="../manifest.json">
+<meta name="theme-color" content="#163829">
+<link rel="apple-touch-icon" href="../assets/icons/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -64,6 +67,9 @@
       </a>
       <a href="#" class="nav-item" data-section="rentals">
         <i class="fa-solid fa-car-side"></i><span>Rentals</span>
+      </a>
+      <a href="#" class="nav-item" data-section="availability">
+        <i class="fa-solid fa-calendar-days"></i><span>Availability</span>
       </a>
       <a href="#" class="nav-item" data-section="gallery">
         <i class="fa-solid fa-images"></i><span>Gallery</span>
@@ -134,6 +140,30 @@
             <span id="stat-most-booked" class="dash-panel-note"></span>
           </div>
           <div id="bookings-chart" class="bar-chart"></div>
+        </div>
+
+        <div class="dash-panel-row">
+          <div class="dash-panel">
+            <div class="dash-panel-head">
+              <h3>Status Breakdown</h3>
+            </div>
+            <div id="status-breakdown" class="status-breakdown"></div>
+          </div>
+
+          <div class="dash-panel">
+            <div class="dash-panel-head">
+              <h3>Most Requested Packages</h3>
+              <span class="dash-panel-note">Bookings + enquiries combined</span>
+            </div>
+            <div id="package-popularity" class="popularity-list"></div>
+          </div>
+        </div>
+
+        <div class="dash-panel">
+          <div class="dash-panel-head">
+            <h3>Recent Activity</h3>
+          </div>
+          <div id="recent-activity" class="activity-feed"></div>
         </div>
 
         <div class="quick-actions">
@@ -254,6 +284,59 @@
               </tr>
             </thead>
             <tbody id="rentals-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ── AVAILABILITY ── -->
+      <section id="section-availability" class="section">
+        <div class="section-head">
+          <div>
+            <h2>Package Availability</h2>
+            <p>Block off date ranges when a package can't be booked — shown as unavailable on that package's page</p>
+          </div>
+        </div>
+
+        <div class="dash-panel">
+          <div class="dash-panel-head">
+            <h3>Block New Dates</h3>
+          </div>
+          <form id="availability-form" class="availability-form">
+            <div class="field">
+              <label for="avail-package">Package</label>
+              <select id="avail-package" name="package_slug" required>
+                <option value="">Select a package&hellip;</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="avail-start">Start Date</label>
+              <input id="avail-start" type="date" name="start_date" required>
+            </div>
+            <div class="field">
+              <label for="avail-end">End Date</label>
+              <input id="avail-end" type="date" name="end_date" required>
+            </div>
+            <div class="field">
+              <label for="avail-reason">Reason (optional)</label>
+              <input id="avail-reason" type="text" name="reason" placeholder="e.g. Fully booked, vehicle maintenance" maxlength="200">
+            </div>
+            <button type="submit" class="btn-primary"><i class="fa-solid fa-ban"></i> Block These Dates</button>
+            <p class="form-error" id="availability-error"></p>
+          </form>
+        </div>
+
+        <div class="table-wrap">
+          <table id="availability-table">
+            <thead>
+              <tr>
+                <th>Package</th>
+                <th>Start Date</th>
+                <th>End Date</th>
+                <th>Reason</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="availability-tbody"></tbody>
           </table>
         </div>
       </section>

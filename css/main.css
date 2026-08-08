@@ -586,6 +586,44 @@ section{ position:relative; }
 .pkg-inclusions-grid i.is-excluded{ color: var(--rust-500); }
 .pkg-detail-footnote{ margin-top: var(--sp-5); font-size: var(--fs-xs); color: var(--slate-500); }
 
+/* ---------- Availability calendar --------------------------------------------------------------- */
+.pkg-availability-section{ margin-top: var(--sp-6); }
+.pkg-availability-intro{ color: var(--slate-500); font-size: var(--fs-sm); margin-top: -.3rem; margin-bottom: var(--sp-4); }
+.pkg-avail-months{
+  display:grid; grid-template-columns: 1fr 1fr; gap: var(--sp-5);
+}
+.pkg-avail-month h4{
+  font-family: var(--font-display); font-size: var(--fs-md); font-weight:600;
+  color: var(--ink); margin-bottom: var(--sp-3); text-align:center;
+}
+.pkg-avail-weekdays{
+  display:grid; grid-template-columns: repeat(7, 1fr);
+  font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--slate-300);
+  text-align:center; margin-bottom: .4rem;
+}
+.pkg-avail-grid{
+  display:grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+}
+.pkg-avail-cell{
+  aspect-ratio: 1; display:flex; align-items:center; justify-content:center;
+  font-size: var(--fs-xs); border-radius: var(--radius-sm);
+}
+.pkg-avail-cell.is-empty{ visibility:hidden; }
+.pkg-avail-cell.is-open{ background: var(--mist-050); color: var(--slate-700); }
+.pkg-avail-cell.is-blocked{
+  background: rgba(192,57,43,0.12); color: var(--rust-500); font-weight:600;
+  text-decoration: line-through; cursor: help;
+}
+.pkg-avail-cell.is-past{ background:none; color: var(--slate-300); opacity:.5; }
+.pkg-avail-legend{
+  display:flex; gap: var(--sp-4); margin-top: var(--sp-4);
+  font-size: var(--fs-xs); color: var(--slate-500);
+}
+.pkg-avail-legend span{ display:inline-flex; align-items:center; gap:.5em; }
+.pkg-avail-dot{ width:10px; height:10px; border-radius:3px; display:inline-block; }
+.pkg-avail-dot.is-open{ background: var(--mist-100); border:1px solid var(--line-light); }
+.pkg-avail-dot.is-blocked{ background: rgba(192,57,43,0.35); }
+
 /* Sidebar */
 .pkg-detail-sidebar{
   position:sticky; top: calc(var(--nav-h) + var(--sp-4));
@@ -685,4 +723,5 @@ section{ position:relative; }
   .pkg-route-map-head{ flex-direction:column; align-items:flex-start; }
   .tb-modal-row{ grid-template-columns:1fr; }
   .subpage-hero{ min-height:260px; }
+  .pkg-avail-months{ grid-template-columns: 1fr; }
 }

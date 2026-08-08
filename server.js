@@ -290,6 +290,63 @@ app.delete('/api/packages/:id', requireAuth, (req, res) => {
   }
 });
 
+// ─── Availability blocks ────────────────────────────────────────────────────
+
+// Public — used by the package detail page's availability calendar.
+app.get('/api/packages/:slug/availability', (req, res) => {
+  try {
+    res.json(db.getAvailabilityBySlug(req.params.slug));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin — full list across every package, for the Availability management screen.
+app.get('/api/admin/availability', requireAuth, (req, res) => {
+  try {
+    res.json(db.getAllAvailability());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/availability', requireAuth, (req, res) => {
+  try {
+    const { package_slug, start_date, end_date, reason } = req.body;
+    if (!package_slug || !start_date || !end_date) {
+      return res.status(400).json({ error: 'Package, start date, and end date are required.' });
+    }
+    const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRe.test(start_date) || !dateRe.test(end_date)) {
+      return res.status(400).json({ error: 'Dates must be in YYYY-MM-DD format.' });
+    }
+    if (start_date > end_date) {
+      return res.status(400).json({ error: 'Start date must be on or before the end date.' });
+    }
+    const pkg = db.getPackageBySlug(package_slug);
+    if (!pkg) return res.status(400).json({ error: 'Unknown package.' });
+
+    const result = db.createAvailabilityBlock({
+      package_slug,
+      start_date,
+      end_date,
+      reason: (reason || '').slice(0, 200)
+    });
+    res.json({ ok: true, id: result.lastInsertRowid });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/admin/availability/:id', requireAuth, (req, res) => {
+  try {
+    db.deleteAvailabilityBlock(parseInt(req.params.id));
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Rentals ──────────────────────────────────────────────────────────────────
 
 app.get('/api/rentals', (req, res) => res.json(db.getAllRentals()));

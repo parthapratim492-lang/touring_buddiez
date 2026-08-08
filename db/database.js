@@ -95,6 +95,15 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now'))
   );
 
+  CREATE TABLE IF NOT EXISTS availability_blocks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    package_slug TEXT NOT NULL,
+    start_date TEXT NOT NULL,
+    end_date TEXT NOT NULL,
+    reason TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
   CREATE TABLE IF NOT EXISTS enquiries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -579,14 +588,37 @@ module.exports = {
   setEnquiryStatus: (id, status) => db.prepare('UPDATE enquiries SET status=? WHERE id=?').run(status, id),
   deleteEnquiry: (id) => db.prepare('DELETE FROM enquiries WHERE id = ?').run(id),
 
+  // ─── Availability blocks ──────────────────────────────────────────────────
+  getAvailabilityBySlug: (slug) => db.prepare(
+    'SELECT * FROM availability_blocks WHERE package_slug = ? ORDER BY start_date'
+  ).all(slug),
+
+  getAllAvailability: () => db.prepare(`
+    SELECT ab.*, p.name as package_name
+    FROM availability_blocks ab
+    LEFT JOIN packages p ON p.slug = ab.package_slug
+    ORDER BY ab.start_date
+  `).all(),
+
+  createAvailabilityBlock: (data) => db.prepare(`
+    INSERT INTO availability_blocks (package_slug, start_date, end_date, reason)
+    VALUES (@package_slug, @start_date, @end_date, @reason)
+  `).run(data),
+
+  deleteAvailabilityBlock: (id) => db.prepare(
+    'DELETE FROM availability_blocks WHERE id = ?'
+  ).run(id),
+
   // Stats (for the admin analytics dashboard)
   getStats: () => {
     const packages = db.prepare('SELECT COUNT(*) as c FROM packages').get().c;
     const bookings = db.prepare('SELECT COUNT(*) as c FROM bookings').get().c;
     const bookingsPending = db.prepare("SELECT COUNT(*) as c FROM bookings WHERE status = 'pending'").get().c;
     const bookingsConfirmed = db.prepare("SELECT COUNT(*) as c FROM bookings WHERE status = 'confirmed'").get().c;
+    const bookingsCancelled = db.prepare("SELECT COUNT(*) as c FROM bookings WHERE status = 'cancelled'").get().c;
     const enquiries = db.prepare('SELECT COUNT(*) as c FROM enquiries').get().c;
     const enquiriesNew = db.prepare("SELECT COUNT(*) as c FROM enquiries WHERE status = 'new'").get().c;
+    const enquiriesClosed = db.prepare("SELECT COUNT(*) as c FROM enquiries WHERE status = 'closed'").get().c;
     const testimonialsPending = db.prepare("SELECT COUNT(*) as c FROM testimonials WHERE status = 'pending'").get().c;
     const mostBookedPackage = db.prepare(`
       SELECT package_name, COUNT(*) as c FROM bookings
@@ -598,11 +630,39 @@ module.exports = {
       WHERE created_at >= datetime('now', '-30 days')
       GROUP BY day ORDER BY day
     `).all();
+
+    // Package popularity — bookings + enquiries combined per package, ranked.
+    const packagePopularity = db.prepare(`
+      SELECT name, SUM(c) as count FROM (
+        SELECT package_name as name, COUNT(*) as c FROM bookings
+        WHERE package_name IS NOT NULL AND package_name != ''
+        GROUP BY package_name
+        UNION ALL
+        SELECT package_name as name, COUNT(*) as c FROM enquiries
+        WHERE package_name IS NOT NULL AND package_name != ''
+        GROUP BY package_name
+      )
+      GROUP BY name ORDER BY count DESC LIMIT 8
+    `).all();
+
+    // Recent activity — latest bookings + enquiries combined into one feed.
+    const recentBookings = db.prepare(`
+      SELECT 'booking' as type, id, name, package_name, status, created_at
+      FROM bookings ORDER BY created_at DESC LIMIT 8
+    `).all();
+    const recentEnquiries = db.prepare(`
+      SELECT 'enquiry' as type, id, name, package_name, status, created_at
+      FROM enquiries ORDER BY created_at DESC LIMIT 8
+    `).all();
+    const recentActivity = [...recentBookings, ...recentEnquiries]
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      .slice(0, 8);
+
     return {
-      packages, bookings, bookingsPending, bookingsConfirmed,
-      enquiries, enquiriesNew, testimonialsPending,
+      packages, bookings, bookingsPending, bookingsConfirmed, bookingsCancelled,
+      enquiries, enquiriesNew, enquiriesClosed, testimonialsPending,
       mostBookedPackage: mostBookedPackage ? mostBookedPackage.package_name : null,
-      bookingsByDay
+      bookingsByDay, packagePopularity, recentActivity
     };
   }
 };

@@ -122,7 +122,7 @@ function showSection(name) {
 
   const titles = {
     dashboard: 'Dashboard', packages: 'Tour Packages', bookings: 'Bookings', enquiries: 'Enquiries',
-    rentals: 'Rental Vehicles', gallery: 'Gallery', testimonials: 'Testimonials',
+    rentals: 'Rental Vehicles', availability: 'Package Availability', gallery: 'Gallery', testimonials: 'Testimonials',
     settings: 'Site Settings', account: 'Change Password'
   };
   document.getElementById('topbar-title').textContent = titles[name] || name;
@@ -133,6 +133,7 @@ function showSection(name) {
   else if (name === 'bookings') loadBookings();
   else if (name === 'enquiries') loadEnquiries();
   else if (name === 'rentals') loadRentals();
+  else if (name === 'availability') loadAvailability();
   else if (name === 'gallery') loadGallery();
   else if (name === 'testimonials') loadTestimonials();
   else if (name === 'settings') loadSettings();
@@ -222,7 +223,75 @@ async function loadDashboard() {
     updateBookingBadge(stats.bookingsPending);
     updateEnquiryBadge(stats.enquiriesNew);
     renderBookingsChart(stats.bookingsByDay);
+    renderStatusBreakdown(stats);
+    renderPackagePopularity(stats.packagePopularity);
+    renderRecentActivity(stats.recentActivity);
   } catch (ex) { console.error(ex); }
+}
+
+function renderStatusBreakdown(stats) {
+  const el = document.getElementById('status-breakdown');
+  if (!el) return;
+  el.innerHTML = `
+    <div class="status-breakdown-group">
+      <h4>Bookings</h4>
+      <div class="status-breakdown-pills">
+        <span class="status-breakdown-pill pending"><b>${stats.bookingsPending}</b> Pending</span>
+        <span class="status-breakdown-pill confirmed"><b>${stats.bookingsConfirmed}</b> Confirmed</span>
+        <span class="status-breakdown-pill cancelled"><b>${stats.bookingsCancelled}</b> Cancelled</span>
+      </div>
+    </div>
+    <div class="status-breakdown-group">
+      <h4>Enquiries</h4>
+      <div class="status-breakdown-pills">
+        <span class="status-breakdown-pill new"><b>${stats.enquiriesNew}</b> New</span>
+        <span class="status-breakdown-pill closed"><b>${stats.enquiriesClosed}</b> Closed</span>
+      </div>
+    </div>
+  `;
+}
+
+function renderPackagePopularity(rows) {
+  const el = document.getElementById('package-popularity');
+  if (!el) return;
+  if (!rows || !rows.length) {
+    el.innerHTML = '<p class="dash-panel-empty">No bookings or enquiries linked to packages yet.</p>';
+    return;
+  }
+  const max = Math.max(...rows.map(r => r.count), 1);
+  el.innerHTML = rows.map(r => `
+    <div class="popularity-row">
+      <span class="popularity-name">${esc(r.name)}</span>
+      <span class="popularity-count">${r.count}</span>
+      <div class="popularity-bar-track"><div class="popularity-bar-fill" style="width:${Math.round((r.count / max) * 100)}%"></div></div>
+    </div>
+  `).join('');
+}
+
+function renderRecentActivity(rows) {
+  const el = document.getElementById('recent-activity');
+  if (!el) return;
+  if (!rows || !rows.length) {
+    el.innerHTML = '<p class="dash-panel-empty">No bookings or enquiries yet.</p>';
+    return;
+  }
+  el.innerHTML = rows.map(r => {
+    const isBooking = r.type === 'booking';
+    const verb = isBooking ? 'booked' : 'enquired about';
+    const pkg = r.package_name ? ` <b>${esc(r.package_name)}</b>` : '';
+    const when = new Date(r.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    return `
+      <div class="activity-row">
+        <div class="activity-icon ${isBooking ? 'booking' : 'enquiry'}">
+          <i class="fa-solid ${isBooking ? 'fa-calendar-check' : 'fa-envelope'}"></i>
+        </div>
+        <div class="activity-body">
+          <div class="activity-title">${esc(r.name || 'Someone')} ${verb}${pkg}</div>
+          <div class="activity-meta">${when} &middot; <span class="status-pill ${esc(r.status)}">${esc(r.status)}</span></div>
+        </div>
+      </div>
+    `;
+  }).join('');
 }
 
 function renderBookingsChart(byDay) {
@@ -756,7 +825,96 @@ async function deleteEnquiry(id) {
   } catch (ex) { toast('Error: ' + ex.message, true); }
 }
 
-// ─── RENTALS ─────────────────────────────────────────────────────────────────
+// ─── AVAILABILITY ────────────────────────────────────────────────────────────
+let allAvailability = [];
+let availabilityFormBound = false;
+
+async function loadAvailability() {
+  try {
+    const [blocks, pkgs] = await Promise.all([
+      api('GET', '/api/admin/availability'),
+      api('GET', '/api/packages')
+    ]);
+    allAvailability = blocks;
+    populateAvailabilityPackageSelect(pkgs);
+    renderAvailabilityTable();
+    bindAvailabilityForm();
+  } catch (ex) { toast('Failed to load availability', true); }
+}
+
+function populateAvailabilityPackageSelect(pkgs) {
+  const select = document.getElementById('avail-package');
+  const current = select.value;
+  select.innerHTML = '<option value="">Select a package&hellip;</option>' +
+    pkgs.map(p => `<option value="${esc(p.slug)}">${esc(p.name)}</option>`).join('');
+  if (current) select.value = current;
+}
+
+function renderAvailabilityTable() {
+  const tbody = document.getElementById('availability-tbody');
+  if (!allAvailability.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--slate-300)">No dates blocked yet — every package shows as open.</td></tr>';
+    return;
+  }
+  const fmt = (d) => new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  tbody.innerHTML = allAvailability.map(b => `
+    <tr>
+      <td><strong>${esc(b.package_name || b.package_slug)}</strong></td>
+      <td>${fmt(b.start_date)}</td>
+      <td>${fmt(b.end_date)}</td>
+      <td>${esc(b.reason || '–')}</td>
+      <td>
+        <div class="row-actions">
+          <button class="btn-danger" onclick="deleteAvailabilityBlock(${b.id})"><i class="fa-solid fa-trash"></i> Remove</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function bindAvailabilityForm() {
+  if (availabilityFormBound) return;
+  availabilityFormBound = true;
+  document.getElementById('availability-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const errEl = document.getElementById('availability-error');
+    errEl.textContent = '';
+    const fd = new FormData(e.target);
+    const payload = {
+      package_slug: fd.get('package_slug'),
+      start_date: fd.get('start_date'),
+      end_date: fd.get('end_date'),
+      reason: fd.get('reason')
+    };
+    if (!payload.package_slug || !payload.start_date || !payload.end_date) {
+      errEl.textContent = 'Please select a package and both dates.';
+      return;
+    }
+    if (payload.start_date > payload.end_date) {
+      errEl.textContent = 'Start date must be on or before the end date.';
+      return;
+    }
+    try {
+      await api('POST', '/api/admin/availability', payload);
+      toast('Dates blocked');
+      e.target.reset();
+      loadAvailability();
+    } catch (ex) {
+      errEl.textContent = ex.message;
+    }
+  });
+}
+
+async function deleteAvailabilityBlock(id) {
+  if (!confirm('Remove this blocked date range? The package will show as available again for those dates.')) return;
+  try {
+    await api('DELETE', `/api/admin/availability/${id}`);
+    toast('Block removed');
+    loadAvailability();
+  } catch (ex) { toast('Failed to remove block', true); }
+}
+
+
 async function loadRentals() {
   try {
     allRentals = await api('GET', '/api/rentals');
