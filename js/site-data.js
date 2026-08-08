@@ -120,7 +120,7 @@
     const grid = document.querySelector('.packages-grid');
     if (!grid || !packages || !packages.length) return;
 
-    const whatsapp = settings?.whatsapp || '916002816370';
+    const whatsapp = settings?.whatsapp || '919707386186';
 
     const cards = packages.map((p, i) => `
       <article class="pkg-card card tilt" data-reveal${i > 0 ? ` data-reveal-delay="${i % 3}"` : ''}>
@@ -164,7 +164,7 @@
     const grid = document.querySelector('.rentals-grid');
     if (!grid || !rentals || !rentals.length) return;
 
-    const whatsapp = settings?.whatsapp || '916002816370';
+    const whatsapp = settings?.whatsapp || '919707386186';
 
     grid.innerHTML = rentals.map((r, i) => {
       const tags = Array.isArray(r.tags) ? r.tags : [];
@@ -255,7 +255,7 @@
       fetchJSON('/api/settings')
     ]);
 
-    const whatsapp = settings?.whatsapp || '916002816370';
+    const whatsapp = settings?.whatsapp || '919707386186';
     const grid = document.querySelector('.packages-grid');
     if (!grid || !packages || !packages.length) return;
 
@@ -309,7 +309,7 @@
       return;
     }
 
-    const whatsapp = settings?.whatsapp || '916002816370';
+    const whatsapp = settings?.whatsapp || '919707386186';
     renderPackageDetail(pkg, whatsapp);
   }
 
@@ -333,6 +333,47 @@
     el.setAttribute('href', href);
   }
 
+  function setStructuredData(pkg) {
+    const id = 'pkg-structured-data';
+    let el = document.getElementById(id);
+    if (!el) {
+      el = document.createElement('script');
+      el.id = id;
+      el.type = 'application/ld+json';
+      document.head.appendChild(el);
+    }
+    const priceNumber = (pkg.price || '').toString().replace(/[^0-9.]/g, '');
+    const data = {
+      '@context': 'https://schema.org',
+      '@type': 'TouristTrip',
+      name: pkg.name,
+      description: pkg.description || `${pkg.name} — ${pkg.route || ''}`,
+      touristType: 'Leisure',
+      itinerary: {
+        '@type': 'ItemList',
+        itemListElement: (Array.isArray(pkg.route_stops) ? pkg.route_stops : []).map((stop, i) => ({
+          '@type': 'ListItem',
+          position: i + 1,
+          name: typeof stop === 'string' ? stop : (stop.name || `Stop ${i + 1}`)
+        }))
+      },
+      provider: {
+        '@type': 'TravelAgency',
+        name: 'Touring Buddiez',
+        url: 'https://touringbuddiez.com/'
+      },
+      offers: priceNumber ? {
+        '@type': 'Offer',
+        price: priceNumber,
+        priceCurrency: 'INR',
+        availability: 'https://schema.org/InStock',
+        url: `https://touringbuddiez.com/package-detail.html?slug=${pkg.slug}`
+      } : undefined
+    };
+    if (pkg.image_path) data.image = `https://touringbuddiez.com/${pkg.image_path}`;
+    el.textContent = JSON.stringify(data);
+  }
+
   function showDetailError(msg) {
     const content = document.getElementById('pkg-detail-content');
     if (content) content.innerHTML = `<div class="state-empty"><i class="fa-solid fa-triangle-exclamation" style="font-size:2rem;margin-bottom:1rem;display:block;color:var(--rust-500)"></i><p>${msg}</p><a href="packages.html" class="btn btn-dark btn-sm" style="display:inline-flex;margin-top:1rem">Back to Packages</a></div>`;
@@ -353,6 +394,8 @@
     setMetaTag('name', 'twitter:title', document.title);
     setMetaTag('name', 'twitter:description', pkg.description || `${pkg.name} — ${pkg.route}`);
     if (pkg.image_path) setMetaTag('name', 'twitter:image', `https://touringbuddiez.com/${pkg.image_path}`);
+
+    setStructuredData(pkg);
 
     // Hero image and title
     const heroImg = document.getElementById('pkg-hero-img');

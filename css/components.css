@@ -124,6 +124,43 @@ h1,h2,h3,h4{ font-family: var(--font-display); line-height: var(--lh-tight); fon
 .btn-sm{ padding: .8em 1.5em; font-size: var(--fs-xs); }
 
 /* ripple element injected by JS */
+/* ── Floating instant-booking CTA ───────────────────────────────────────── */
+.float-book{
+  position: fixed; right: var(--sp-4); bottom: var(--sp-4); z-index: var(--z-nav, 500);
+  display: flex; align-items: center; gap: 0.65rem;
+  background: linear-gradient(135deg, #25D366, #1DA851);
+  color: #fff; text-decoration: none;
+  padding: 0.85rem 1.3rem 0.85rem 0.9rem; border-radius: var(--radius-pill);
+  font-family: var(--font-body); font-weight: 700; font-size: 0.92rem;
+  box-shadow: 0 14px 34px -10px rgba(29,168,81,0.55), 0 0 0 1px rgba(255,255,255,0.15) inset;
+  transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+}
+.float-book:hover{ transform: translateY(-3px) scale(1.02); box-shadow: 0 20px 42px -10px rgba(29,168,81,0.65); }
+.float-book .float-book-icon{
+  width: 34px; height: 34px; border-radius: 50%; background: rgba(255,255,255,0.18);
+  display: flex; align-items: center; justify-content: center; font-size: 1.15rem; flex-shrink: 0;
+  position: relative;
+}
+.float-book .float-book-icon::after{
+  content: ""; position: absolute; inset: -6px; border-radius: 50%;
+  border: 2px solid rgba(37,211,102,0.55);
+  animation: float-book-pulse 2.2s var(--ease-out) infinite;
+}
+@keyframes float-book-pulse{
+  0%{ transform: scale(0.85); opacity: 0.9; }
+  100%{ transform: scale(1.5); opacity: 0; }
+}
+.float-book-text{ display: flex; flex-direction: column; line-height: 1.15; }
+.float-book-text small{ font-weight: 500; font-size: 0.68rem; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.04em; }
+@media (max-width: 640px){
+  .float-book{ right: var(--sp-2); bottom: var(--sp-2); padding: 0.75rem 1.05rem 0.75rem 0.75rem; }
+  .float-book-text small{ display: none; }
+  .float-book .float-book-icon{ width: 30px; height: 30px; font-size: 1.05rem; }
+}
+@media (prefers-reduced-motion: reduce){
+  .float-book .float-book-icon::after{ animation: none; }
+}
+
 .btn .ripple{
   position:absolute;
   border-radius:50%;

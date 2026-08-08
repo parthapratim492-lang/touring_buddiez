@@ -203,7 +203,7 @@ function seed() {
         route: 'Shillong · Dawki · Cherrapunji',
         duration: '3D / 2N',
         group_size: '2–10 people',
-        vehicle: 'Innova',
+        vehicle: 'SUV',
         price: null,
         image_path: 'assets/destinations/meghalaya.jpg',
         description: "A compact loop through Meghalaya's best-known stops — waterfalls, the living root bridges around Cherrapunji, and the clear waters of Dawki.",
@@ -230,7 +230,7 @@ function seed() {
         route: 'Paro · Thimphu · Punakha',
         duration: '5 Days',
         group_size: 'Small groups',
-        vehicle: 'Innova',
+        vehicle: 'SUV',
         price: null,
         image_path: 'assets/destinations/bhutan.jpg',
         description: "A guided journey through Bhutan's western valley towns — Tiger's Nest monastery, Punakha Dzong, and the forested road between Thimphu and Paro.",
@@ -261,7 +261,7 @@ function seed() {
         route: 'Gangtok · Tsomgo Lake · Monasteries',
         duration: '4 Days',
         group_size: '2–8 people',
-        vehicle: 'Scorpio',
+        vehicle: 'SUV',
         price: null,
         image_path: 'assets/destinations/sikkim.jpg',
         description: "High-altitude Sikkim — Gangtok's monastery circuit, Tsomgo lake and Nathula pass (if open), and the Rumtek monastery.",
@@ -290,7 +290,7 @@ function seed() {
         route: 'Dibang Valley · Arunachal Pradesh',
         duration: '6 Days',
         group_size: 'Small groups',
-        vehicle: 'Scorpio',
+        vehicle: 'SUV',
         price: null,
         image_path: 'assets/destinations/anini.jpg',
         description: "One of India's most remote districts — the Dibang Valley road to Anini takes you through pristine forests, river valleys, and Adi tribal villages.",
@@ -323,7 +323,7 @@ function seed() {
         route: 'Dong Valley · Arunachal Pradesh',
         duration: '5 Days',
         group_size: 'Small groups',
-        vehicle: 'Scorpio',
+        vehicle: 'SUV',
         price: null,
         image_path: 'assets/destinations/dong.jpg',
         description: "Dong village in Anjaw district is the easternmost point of India — famous for being the first place in the country to see the sunrise. A truly off-the-beaten-path expedition.",
@@ -381,7 +381,7 @@ function seed() {
         route: 'Tezu · Hawai · Kibithu · Kaho',
         duration: '6 Days',
         group_size: 'Small groups',
-        vehicle: 'Scorpio',
+        vehicle: 'SUV',
         price: null,
         image_path: 'assets/destinations/kaho.jpg',
         description: "Kaho, on the India-China border in Anjaw district, is the easternmost inhabited village in the country — reached via a long, spectacular drive along the Lohit river through Tezu, Hawai and Kibithu. One of the most remote expeditions we run.",
@@ -420,10 +420,10 @@ function seed() {
       VALUES (@name, @seats, @tags, @image_path, @whatsapp, @display_order)
     `);
     [
-      { name: 'Toyota Innova Crysta', seats: '7', tags: JSON.stringify([{ icon: 'fa-users', label: '7 seats' }, { icon: 'fa-gas-pump', label: 'Diesel' }]), image_path: 'assets/rentals/innova.jpg', whatsapp: '916002816370', display_order: 1 },
-      { name: 'Maruti Ertiga', seats: '7', tags: JSON.stringify([{ icon: 'fa-users', label: '7 seats' }, { icon: 'fa-snowflake', label: 'AC' }]), image_path: 'assets/rentals/ertiga.jpg', whatsapp: '916002816370', display_order: 2 },
-      { name: 'Mahindra Scorpio', seats: '7', tags: JSON.stringify([{ icon: 'fa-mountain', label: 'SUV' }, { icon: 'fa-road', label: 'Mountain-ready' }]), image_path: 'assets/rentals/scorpio.jpg', whatsapp: '916002816370', display_order: 3 },
-      { name: 'Swift Dzire', seats: '5', tags: JSON.stringify([{ icon: 'fa-car', label: 'Sedan' }, { icon: 'fa-plane', label: 'Airport pickup' }]), image_path: 'assets/rentals/dzire.jpg', whatsapp: '916002816370', display_order: 4 }
+      { name: 'Toyota Innova Crysta', seats: '7', tags: JSON.stringify([{ icon: 'fa-users', label: '7 seats' }, { icon: 'fa-gas-pump', label: 'Diesel' }]), image_path: 'assets/rentals/innova.jpg', whatsapp: '919707386186', display_order: 1 },
+      { name: 'Maruti Ertiga', seats: '7', tags: JSON.stringify([{ icon: 'fa-users', label: '7 seats' }, { icon: 'fa-snowflake', label: 'AC' }]), image_path: 'assets/rentals/ertiga.jpg', whatsapp: '919707386186', display_order: 2 },
+      { name: 'Mahindra Scorpio', seats: '7', tags: JSON.stringify([{ icon: 'fa-mountain', label: 'SUV' }, { icon: 'fa-road', label: 'Mountain-ready' }]), image_path: 'assets/rentals/scorpio.jpg', whatsapp: '919707386186', display_order: 3 },
+      { name: 'Swift Dzire', seats: '5', tags: JSON.stringify([{ icon: 'fa-car', label: 'Sedan' }, { icon: 'fa-plane', label: 'Airport pickup' }]), image_path: 'assets/rentals/dzire.jpg', whatsapp: '919707386186', display_order: 4 }
     ].forEach(r => insertRental.run(r));
   }
 
@@ -460,9 +460,10 @@ function seed() {
   if (settingCount === 0) {
     const insertSetting = db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');
     [
-      ['phone', '+91 60028 16370'],
-      ['phone_raw', '+916002816370'],
-      ['whatsapp', '916002816370'],
+      ['phone', '+91 97073 86186'],
+      ['phone_raw', '+919707386186'],
+      ['whatsapp', '919707386186'],
+      ['email', 'tourbuddiez@gmail.com'],
       ['instagram', 'touring_buddiez'],
       ['facebook', '#'],
       ['base_location', 'Guwahati, Assam'],

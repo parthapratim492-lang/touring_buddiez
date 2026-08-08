@@ -5,6 +5,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const db = require('./db/database');
+const { sendBookingConfirmedEmail } = require('./lib/mailer');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -361,7 +362,7 @@ app.post('/api/rentals', requireAuth, upload.single('image'), (req, res) => {
 
     db.createRental({
       name, seats, tags: tags || '[]', image_path,
-      whatsapp: whatsapp || db.getSetting('whatsapp') || '916002816370',
+      whatsapp: whatsapp || db.getSetting('whatsapp') || '919707386186',
       display_order: parseInt(display_order) || 0
     });
     res.json({ ok: true });
@@ -588,13 +589,29 @@ app.post('/api/bookings', (req, res) => {
 
 app.get('/api/bookings', requireAuth, (req, res) => res.json(db.getAllBookings()));
 
-app.patch('/api/bookings/:id/status', requireAuth, (req, res) => {
+app.patch('/api/bookings/:id/status', requireAuth, async (req, res) => {
   try {
     const { status } = req.body;
     const allowed = ['pending', 'confirmed', 'completed', 'cancelled'];
     if (!allowed.includes(status)) return res.status(400).json({ error: 'Invalid status' });
-    db.setBookingStatus(parseInt(req.params.id), status);
+
+    const id = parseInt(req.params.id);
+    await db.setBookingStatus(id, status);
     res.json({ ok: true });
+
+    // Fire-and-forget: email the customer once their tour is confirmed.
+    // This runs after the response is sent so a slow/failed email never
+    // delays or breaks the admin action itself.
+    if (status === 'confirmed') {
+      try {
+        const booking = await db.getBookingById(id);
+        if (booking && booking.email) {
+          sendBookingConfirmedEmail(booking).catch(() => {});
+        }
+      } catch (notifyErr) {
+        console.error('[bookings] confirmation email lookup failed:', notifyErr.message);
+      }
+    }
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -683,7 +700,7 @@ app.get('/api/settings', (req, res) => res.json(db.getAllSettings()));
 
 app.put('/api/settings', requireAuth, (req, res) => {
   try {
-    const allowed = ['phone', 'phone_raw', 'whatsapp', 'instagram', 'facebook',
+    const allowed = ['phone', 'phone_raw', 'whatsapp', 'email', 'instagram', 'facebook',
                      'base_location', 'stat_destinations', 'stat_travelers',
                      'stat_years', 'stat_rating', 'site_description', 'response_time'];
     allowed.forEach(key => {

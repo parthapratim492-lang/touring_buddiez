@@ -406,7 +406,7 @@ function openPackageForm(pkg = null) {
           </div>
           <div class="field">
             <label for="fld-vehicle">Vehicle</label>
-            <input id="fld-vehicle" type="text" name="vehicle" value="${esc(pkg?.vehicle || '')}" placeholder="Innova">
+            <input id="fld-vehicle" type="text" name="vehicle" value="${esc(pkg?.vehicle || '')}" placeholder="SUV">
           </div>
         </div>
         <div class="field-row">
@@ -966,7 +966,7 @@ function openRentalForm(rental = null) {
           </div>
           <div class="field">
             <label for="fld-whatsapp">WhatsApp (raw number)</label>
-            <input id="fld-whatsapp" type="text" name="whatsapp" value="${esc(rental?.whatsapp || '')}" placeholder="916002816370">
+            <input id="fld-whatsapp" type="text" name="whatsapp" value="${esc(rental?.whatsapp || '')}" placeholder="919707386186">
           </div>
           <div class="field">
             <label for="fld-display_order">Display Order</label>
