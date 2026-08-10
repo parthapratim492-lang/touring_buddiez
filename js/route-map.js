@@ -47,7 +47,7 @@
 
       // Route line connecting the stops in itinerary order
       L.polyline(latlngs, {
-        color: "#0B3D2E",
+        color: "#16294B",
         weight: 4,
         opacity: 0.85,
         dashArray: "1,8",

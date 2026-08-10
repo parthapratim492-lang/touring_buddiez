@@ -54,21 +54,17 @@
     // Update stat counters
     const statMap = {
       stat_destinations: 'data-count',
-      stat_travelers: 'data-count',
       stat_years: 'data-count',
       stat_rating: 'data-count'
     };
-    // Update hero stats and main stats section
+    // Update the stats band
     document.querySelectorAll('[data-count]').forEach(el => {
       const val = parseFloat(el.getAttribute('data-count'));
       // Match by parent text
-      const parent = el.closest('.stat, .hero-stat');
+      const parent = el.closest('.stat');
       if (!parent) return;
       const label = parent.querySelector('span')?.textContent?.toLowerCase() || '';
       if (label.includes('destination') && s.stat_destinations) el.setAttribute('data-count', s.stat_destinations);
-      else if (label.includes('traveler') || label.includes('happy')) {
-        if (s.stat_travelers) el.setAttribute('data-count', s.stat_travelers);
-      }
       else if (label.includes('founded')) {
         if (s.stat_years) el.setAttribute('data-count', s.stat_years);
       }

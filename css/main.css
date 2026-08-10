@@ -25,7 +25,7 @@ section{ position:relative; }
   animation: draw 1.6s var(--ease-in-out) forwards;
 }
 @keyframes draw{ to{ stroke-dashoffset:0; } }
-.loader-bar{ width:160px; height:2px; background: rgba(228,197,131,0.2); overflow:hidden; border-radius:2px; }
+.loader-bar{ width:160px; height:2px; background: rgba(242,200,121,0.2); overflow:hidden; border-radius:2px; }
 .loader-bar span{ display:block; height:100%; width:0%; background: var(--brass-500); animation: load-bar 1.8s var(--ease-in-out) forwards; }
 @keyframes load-bar{ to{ width:100%; } }
 .loader-text{ font-family: var(--font-mono); font-size: var(--fs-2xs); letter-spacing:.24em; color: var(--brass-400); text-transform:uppercase; }
@@ -76,8 +76,8 @@ section{ position:relative; }
   content:"";
   position:absolute; inset:0; z-index:2;
   background:
-    linear-gradient(180deg, rgba(11,29,21,0.55) 0%, rgba(11,29,21,0.35) 40%, rgba(11,29,21,0.92) 100%),
-    linear-gradient(90deg, rgba(11,29,21,0.75) 0%, rgba(11,29,21,0.05) 55%);
+    linear-gradient(180deg, rgba(11,18,32,0.55) 0%, rgba(11,18,32,0.35) 40%, rgba(11,18,32,0.92) 100%),
+    linear-gradient(90deg, rgba(11,18,32,0.75) 0%, rgba(11,18,32,0.05) 55%);
 }
 
 /* ── Floating particles (pure CSS, no JS cost) — a subtle drift of light
@@ -92,8 +92,8 @@ section{ position:relative; }
   bottom:-20px;
   width:4px; height:4px;
   border-radius:50%;
-  background: rgba(228,197,131,0.55);
-  box-shadow: 0 0 8px 2px rgba(228,197,131,0.35);
+  background: rgba(242,200,121,0.55);
+  box-shadow: 0 0 8px 2px rgba(242,200,121,0.35);
   animation: hero-float linear infinite;
 }
 .hero-particles span:nth-child(1){ left:8%;  width:3px; height:3px; animation-duration:16s; animation-delay:0s; }
@@ -136,31 +136,6 @@ section{ position:relative; }
   font-size: var(--fs-md);
 }
 .hero-ctas{ display:flex; gap: var(--sp-3); margin-top: var(--sp-5); flex-wrap:wrap; }
-
-.hero-stats{
-  margin-top: var(--sp-7);
-  border-radius: var(--radius-lg);
-  padding: var(--sp-4) var(--sp-5);
-  display:flex;
-  justify-content:space-between;
-  gap: var(--sp-4);
-  flex-wrap:wrap;
-}
-.hero-stat{ text-align:left; }
-.hero-stat b{
-  display:block;
-  font-family: var(--font-display);
-  font-size: var(--fs-2xl);
-  color: var(--mist-050);
-  line-height:1;
-}
-.hero-stat span{
-  font-family: var(--font-mono);
-  font-size: var(--fs-2xs);
-  letter-spacing:.1em;
-  text-transform:uppercase;
-  color: rgba(243,246,241,0.6);
-}
 
 .hero-clip-dots{
   position:absolute; bottom: var(--sp-4); left: var(--sp-5);
@@ -249,9 +224,11 @@ section{ position:relative; }
   position:relative; overflow:hidden;
 }
 .stats-grid{
-  display:grid; grid-template-columns: repeat(4,1fr);
+  display:grid; grid-template-columns: repeat(3,1fr);
   gap: var(--sp-5);
   text-align:center;
+  max-width: 760px;
+  margin-inline: auto;
 }
 .stat b{
   display:block;
@@ -327,14 +304,14 @@ section{ position:relative; }
   position:absolute; inset:0;
   display:flex; align-items:center; justify-content:center;
   color:#fff; font-size:1.1rem;
-  background: rgba(11,29,21,0.45);
+  background: rgba(11,18,32,0.45);
   opacity:0; transition: opacity var(--dur-fast);
 }
 .g-item:hover::after{ opacity:1; }
 
 .lightbox{
   position:fixed; inset:0; z-index: var(--z-lightbox);
-  background: rgba(11,29,21,0.94);
+  background: rgba(11,18,32,0.94);
   display:flex; align-items:center; justify-content:center;
   opacity:0; visibility:hidden; transition: opacity var(--dur-med);
   padding: var(--sp-5);
@@ -406,7 +383,7 @@ section{ position:relative; }
   opacity:0; visibility:hidden; transition: opacity var(--dur-med);
 }
 .review-modal.is-open{ opacity:1; visibility:visible; }
-.review-modal-backdrop{ position:absolute; inset:0; background: rgba(11,29,21,0.55); backdrop-filter: blur(4px); }
+.review-modal-backdrop{ position:absolute; inset:0; background: rgba(11,18,32,0.55); backdrop-filter: blur(4px); }
 .review-modal-panel{
   position:relative; width:100%; max-width:520px; max-height:88vh; overflow-y:auto;
   background: var(--paper); border-radius: var(--radius-md); box-shadow: var(--shadow-lg);
@@ -440,7 +417,7 @@ section{ position:relative; }
 .contact-info-item i{
   width:44px; height:44px; border-radius:50%;
   display:flex; align-items:center; justify-content:center;
-  background: rgba(228,197,131,0.12); color: var(--brass-400); flex-shrink:0;
+  background: rgba(242,200,121,0.12); color: var(--brass-400); flex-shrink:0;
 }
 .contact-info-item b{ display:block; color: var(--mist-050); font-size: var(--fs-sm); margin-bottom:.2em; }
 .contact-info-item span, .contact-info-item a{ color: rgba(243,246,241,0.68); font-size: var(--fs-sm); }
@@ -639,7 +616,7 @@ section{ position:relative; }
 .tb-modal-overlay{
   position:fixed; inset:0; z-index: var(--z-lightbox);
   display:flex; align-items:center; justify-content:center; padding: var(--sp-4);
-  opacity:0; visibility:hidden; background: rgba(11,29,21,0.55); backdrop-filter: blur(4px);
+  opacity:0; visibility:hidden; background: rgba(11,18,32,0.55); backdrop-filter: blur(4px);
   transition: opacity var(--dur-med);
 }
 .tb-modal-overlay.is-open{ opacity:1; visibility:visible; }
@@ -671,7 +648,7 @@ section{ position:relative; }
   transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
 }
 #tb-booking-form input:focus, #tb-booking-form textarea:focus{
-  outline:none; border-color: var(--brass-500); box-shadow: 0 0 0 4px rgba(199,154,68,0.15);
+  outline:none; border-color: var(--brass-500); box-shadow: 0 0 0 4px rgba(224,167,62,0.15);
 }
 #tb-booking-form textarea{ resize:vertical; min-height:90px; }
 .tb-modal-row{ display:grid; grid-template-columns:1fr 1fr; gap: var(--sp-3); }
@@ -710,9 +687,8 @@ section{ position:relative; }
 @media (max-width: 760px){
   .nav-links, .nav-actions .btn-ghost{ display:none; }
   .nav-burger{ display:flex; }
-  .hero-stats{ flex-direction:column; gap: var(--sp-3); }
   .why-grid, .packages-grid, .rentals-grid{ grid-template-columns: 1fr; }
-  .stats-grid{ grid-template-columns: repeat(2,1fr); gap: var(--sp-5); }
+  .stats-grid{ grid-template-columns: 1fr; gap: var(--sp-5); }
   .footer-grid{ grid-template-columns: 1fr; gap: var(--sp-5); }
   .footer-bottom{ flex-direction:column; align-items:flex-start; }
   .field-row{ grid-template-columns:1fr; }

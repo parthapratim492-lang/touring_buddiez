@@ -7,33 +7,33 @@
 :root{
 
   /* ---- Palette -----------------------------------------------------------
-     Inspired by Meghalaya's living root bridges and monsoon forest cover:
-     deep pine, misty overcast light, and the brass of monastery bells and
-     prayer-wheel trim. No cream/terracotta, no neon-on-black defaults. */
+     Inspired by Northeast India's dusk-lit mountain passes: deep indigo
+     night sky over the hills, misty cool daylight, and the marigold gold
+     and monastery-flag copper that light up against it. */
 
-  --ink:            #0B1D15;   /* near-black pine, darkest surface        */
-  --forest-900:     #0F2A1F;
-  --forest-800:     #163829;   /* primary brand green                     */
-  --forest-700:     #1E4A36;
-  --forest-600:     #2C5B44;
-  --forest-500:     #3E7259;
+  --ink:            #0B1220;   /* near-black indigo, darkest surface      */
+  --forest-900:     #0F1B33;
+  --forest-800:     #16294B;   /* primary brand indigo                    */
+  --forest-700:     #1F3A66;
+  --forest-600:     #2C4F82;
+  --forest-500:     #4169A6;
 
-  --mist-050:       #F3F6F1;   /* page background, cool sage-white        */
-  --mist-100:       #E9EEE6;
-  --paper:          #FCFDFB;   /* card surfaces                           */
+  --mist-050:       #F5F6FA;   /* page background, cool misty white       */
+  --mist-100:       #E8ECF5;
+  --paper:          #FEFEFF;   /* card surfaces                           */
 
-  --brass-400:      #E4C583;   /* light gold, for text-on-dark            */
-  --brass-500:      #C79A44;   /* primary accent                          */
-  --brass-600:      #A87C31;
+  --brass-400:      #F2C879;   /* light gold, for text-on-dark            */
+  --brass-500:      #E0A73E;   /* primary accent — marigold                */
+  --brass-600:      #B9822A;
 
-  --rust-500:       #A4472F;   /* rare, third accent — badges/alerts only */
+  --rust-500:       #D8572E;   /* third accent — badges/alerts, coral      */
 
-  --slate-700:      #2B342E;   /* body text on light                      */
-  --slate-500:      #5A665D;   /* secondary text on light                 */
-  --slate-300:      #93A199;   /* muted / placeholders                    */
+  --slate-700:      #222A3D;   /* body text on light                      */
+  --slate-500:      #56637C;   /* secondary text on light                 */
+  --slate-300:      #98A2BC;   /* muted / placeholders                    */
 
-  --line-light:      rgba(22,56,41,0.12);
-  --line-dark:        rgba(228,197,131,0.18);
+  --line-light:      rgba(22,41,75,0.12);
+  --line-dark:        rgba(242,200,121,0.18);
 
   /* ---- Typography ---------------------------------------------------------
      Fraunces  — display, carries personality (used with restraint)
@@ -75,10 +75,10 @@
   --radius-lg:  28px;
   --radius-pill: 999px;
 
-  --shadow-sm: 0 2px 10px rgba(11,29,21,0.06);
-  --shadow-md: 0 12px 32px rgba(11,29,21,0.12);
-  --shadow-lg: 0 30px 60px -20px rgba(11,29,21,0.35);
-  --shadow-brass-glow: 0 0 0 1px rgba(199,154,68,0.35), 0 20px 40px -18px rgba(199,154,68,0.45);
+  --shadow-sm: 0 2px 10px rgba(11,18,32,0.06);
+  --shadow-md: 0 12px 32px rgba(11,18,32,0.12);
+  --shadow-lg: 0 30px 60px -20px rgba(11,18,32,0.35);
+  --shadow-brass-glow: 0 0 0 1px rgba(224,167,62,0.35), 0 20px 40px -18px rgba(224,167,62,0.45);
 
   /* ---- Motion -------------------------------------------------------------- */
   --ease-out:      cubic-bezier(.16,.84,.44,1);

@@ -701,7 +701,7 @@ app.get('/api/settings', (req, res) => res.json(db.getAllSettings()));
 app.put('/api/settings', requireAuth, (req, res) => {
   try {
     const allowed = ['phone', 'phone_raw', 'whatsapp', 'email', 'instagram', 'facebook',
-                     'base_location', 'stat_destinations', 'stat_travelers',
+                     'base_location', 'stat_destinations',
                      'stat_years', 'stat_rating', 'site_description', 'response_time'];
     allowed.forEach(key => {
       if (req.body[key] !== undefined) db.setSetting(key, req.body[key]);
