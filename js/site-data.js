@@ -356,17 +356,17 @@
       provider: {
         '@type': 'TravelAgency',
         name: 'Touring Buddiez',
-        url: 'https://touringbuddiez.com/'
+        url: 'https://touringbuddieznortheast.in/'
       },
       offers: priceNumber ? {
         '@type': 'Offer',
         price: priceNumber,
         priceCurrency: 'INR',
         availability: 'https://schema.org/InStock',
-        url: `https://touringbuddiez.com/package-detail.html?slug=${pkg.slug}`
+        url: `https://touringbuddieznortheast.in/package-detail.html?slug=${pkg.slug}`
       } : undefined
     };
-    if (pkg.image_path) data.image = `https://touringbuddiez.com/${pkg.image_path}`;
+    if (pkg.image_path) data.image = `https://touringbuddieznortheast.in/${pkg.image_path}`;
     el.textContent = JSON.stringify(data);
   }
 
@@ -383,13 +383,13 @@
 
     setMetaTag('property', 'og:title', document.title);
     setMetaTag('property', 'og:description', pkg.description || `${pkg.name} — ${pkg.route}`);
-    setMetaTag('property', 'og:url', `https://touringbuddiez.com/package-detail.html?slug=${pkg.slug}`);
-    if (pkg.image_path) setMetaTag('property', 'og:image', `https://touringbuddiez.com/${pkg.image_path}`);
-    setCanonical(`https://touringbuddiez.com/package-detail.html?slug=${pkg.slug}`);
+    setMetaTag('property', 'og:url', `https://touringbuddieznortheast.in/package-detail.html?slug=${pkg.slug}`);
+    if (pkg.image_path) setMetaTag('property', 'og:image', `https://touringbuddieznortheast.in/${pkg.image_path}`);
+    setCanonical(`https://touringbuddieznortheast.in/package-detail.html?slug=${pkg.slug}`);
 
     setMetaTag('name', 'twitter:title', document.title);
     setMetaTag('name', 'twitter:description', pkg.description || `${pkg.name} — ${pkg.route}`);
-    if (pkg.image_path) setMetaTag('name', 'twitter:image', `https://touringbuddiez.com/${pkg.image_path}`);
+    if (pkg.image_path) setMetaTag('name', 'twitter:image', `https://touringbuddieznortheast.in/${pkg.image_path}`);
 
     setStructuredData(pkg);
 

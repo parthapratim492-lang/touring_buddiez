@@ -5,4 +5,4 @@ Disallow: /api/
 Disallow: /db/
 Disallow: /uploads/
 
-Sitemap: https://touringbuddiez.com/sitemap.xml
+Sitemap: https://touringbuddieznortheast.in/sitemap.xml
