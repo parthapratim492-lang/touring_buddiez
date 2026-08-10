@@ -1,3 +1,8 @@
+// Loads variables from a local .env file for development. On Render (and
+// most hosts), real environment variables are already set and this is a
+// silent no-op — Render doesn't ship a .env file, so there's nothing to load.
+require('dotenv').config();
+
 const express = require('express');
 const session = require('express-session');
 const bcrypt = require('bcryptjs');
@@ -37,11 +42,13 @@ app.use((req, res, next) => {
 // express.static(__dirname) below serves the whole project root so the site's
 // existing relative paths (css/, js/, assets/) keep working without a rewrite.
 // That means anything else in the project root is reachable by URL unless we
-// explicitly deny it first — critically the SQLite database (customer PII +
-// the admin's password hash), the server source, and deploy/config files.
+// explicitly deny it first — critically the server source, the admin's
+// password hash logic, and deploy/config files (the database itself now
+// lives in MongoDB Atlas, off this server entirely).
 const DENIED_PATHS = [
   '/db', '/server.js', '/package.json', '/package-lock.json',
-  '/.replit', '/replit.nix', '/replit.md', '/.env', '/.git', '/node_modules'
+  '/.replit', '/replit.nix', '/replit.md', '/.env', '/.git', '/node_modules',
+  '/mongodb_setup.md'
 ];
 app.use((req, res, next) => {
   const p = req.path.toLowerCase();
@@ -166,7 +173,7 @@ app.post('/api/auth/login', loginRateLimit, async (req, res) => {
     const { username, password } = req.body;
     if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
 
-    const admin = db.getAdmin(username);
+    const admin = await db.getAdmin(username);
     if (!admin) return res.status(401).json({ error: 'Invalid credentials' });
 
     const ok = await bcrypt.compare(password, admin.password_hash);
@@ -194,12 +201,12 @@ app.get('/api/auth/check', (req, res) => {
 app.post('/api/auth/change-password', requireAuth, async (req, res) => {
   try {
     const { current_password, new_password } = req.body;
-    const admin = db.getAdmin(req.session.admin.username);
+    const admin = await db.getAdmin(req.session.admin.username);
     const ok = await bcrypt.compare(current_password, admin.password_hash);
     if (!ok) return res.status(401).json({ error: 'Current password is incorrect' });
     if (!new_password || new_password.length < 6) return res.status(400).json({ error: 'New password must be at least 6 characters' });
     const hash = await bcrypt.hash(new_password, 10);
-    db.updateAdminPassword(admin.id, hash);
+    await db.updateAdminPassword(admin.id, hash);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
@@ -208,18 +215,26 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
 
 // ─── Packages ─────────────────────────────────────────────────────────────────
 
-app.get('/api/packages', (req, res) => {
-  const featured = req.query.featured === 'true';
-  res.json(featured ? db.getFeaturedPackages() : db.getAllPackages());
+app.get('/api/packages', async (req, res) => {
+  try {
+    const featured = req.query.featured === 'true';
+    res.json(featured ? await db.getFeaturedPackages() : await db.getAllPackages());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-app.get('/api/packages/:slug', (req, res) => {
-  const pkg = db.getPackageBySlug(req.params.slug);
-  if (!pkg) return res.status(404).json({ error: 'Package not found' });
-  res.json(pkg);
+app.get('/api/packages/:slug', async (req, res) => {
+  try {
+    const pkg = await db.getPackageBySlug(req.params.slug);
+    if (!pkg) return res.status(404).json({ error: 'Package not found' });
+    res.json(pkg);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-app.post('/api/packages', requireAuth, upload.single('image'), (req, res) => {
+app.post('/api/packages', requireAuth, upload.single('image'), async (req, res) => {
   try {
     const { slug, name, route, duration, group_size, vehicle, price, description,
             itinerary, inclusions, exclusions, highlights, route_stops, featured, display_order } = req.body;
@@ -241,19 +256,21 @@ app.post('/api/packages', requireAuth, upload.single('image'), (req, res) => {
       display_order: parseInt(display_order) || 0
     };
 
-    const result = db.createPackage(data);
+    const existing = await db.getPackageBySlug(data.slug);
+    if (existing) return res.status(409).json({ error: 'A package with this slug already exists' });
+
+    const result = await db.createPackage(data);
     res.json({ ok: true, id: result.lastInsertRowid });
   } catch (err) {
     console.error('Create package error:', err);
-    if (err.message.includes('UNIQUE')) return res.status(409).json({ error: 'A package with this slug already exists' });
     res.status(500).json({ error: err.message });
   }
 });
 
-app.put('/api/packages/:id', requireAuth, upload.single('image'), (req, res) => {
+app.put('/api/packages/:id', requireAuth, upload.single('image'), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const existing = db.getPackageById(id);
+    const existing = await db.getPackageById(id);
     if (!existing) return res.status(404).json({ error: 'Package not found' });
 
     const { slug, name, route, duration, group_size, vehicle, price, description,
@@ -274,7 +291,7 @@ app.put('/api/packages/:id', requireAuth, upload.single('image'), (req, res) => 
       display_order: parseInt(display_order) || 0
     };
 
-    db.updatePackage(id, data);
+    await db.updatePackage(id, data);
     res.json({ ok: true });
   } catch (err) {
     console.error('Update package error:', err);
@@ -282,9 +299,9 @@ app.put('/api/packages/:id', requireAuth, upload.single('image'), (req, res) => 
   }
 });
 
-app.delete('/api/packages/:id', requireAuth, (req, res) => {
+app.delete('/api/packages/:id', requireAuth, async (req, res) => {
   try {
-    db.deletePackage(parseInt(req.params.id));
+    await db.deletePackage(parseInt(req.params.id));
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -294,24 +311,24 @@ app.delete('/api/packages/:id', requireAuth, (req, res) => {
 // ─── Availability blocks ────────────────────────────────────────────────────
 
 // Public — used by the package detail page's availability calendar.
-app.get('/api/packages/:slug/availability', (req, res) => {
+app.get('/api/packages/:slug/availability', async (req, res) => {
   try {
-    res.json(db.getAvailabilityBySlug(req.params.slug));
+    res.json(await db.getAvailabilityBySlug(req.params.slug));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
 // Admin — full list across every package, for the Availability management screen.
-app.get('/api/admin/availability', requireAuth, (req, res) => {
+app.get('/api/admin/availability', requireAuth, async (req, res) => {
   try {
-    res.json(db.getAllAvailability());
+    res.json(await db.getAllAvailability());
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.post('/api/admin/availability', requireAuth, (req, res) => {
+app.post('/api/admin/availability', requireAuth, async (req, res) => {
   try {
     const { package_slug, start_date, end_date, reason } = req.body;
     if (!package_slug || !start_date || !end_date) {
@@ -324,10 +341,10 @@ app.post('/api/admin/availability', requireAuth, (req, res) => {
     if (start_date > end_date) {
       return res.status(400).json({ error: 'Start date must be on or before the end date.' });
     }
-    const pkg = db.getPackageBySlug(package_slug);
+    const pkg = await db.getPackageBySlug(package_slug);
     if (!pkg) return res.status(400).json({ error: 'Unknown package.' });
 
-    const result = db.createAvailabilityBlock({
+    const result = await db.createAvailabilityBlock({
       package_slug,
       start_date,
       end_date,
@@ -339,9 +356,9 @@ app.post('/api/admin/availability', requireAuth, (req, res) => {
   }
 });
 
-app.delete('/api/admin/availability/:id', requireAuth, (req, res) => {
+app.delete('/api/admin/availability/:id', requireAuth, async (req, res) => {
   try {
-    db.deleteAvailabilityBlock(parseInt(req.params.id));
+    await db.deleteAvailabilityBlock(parseInt(req.params.id));
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -350,9 +367,15 @@ app.delete('/api/admin/availability/:id', requireAuth, (req, res) => {
 
 // ─── Rentals ──────────────────────────────────────────────────────────────────
 
-app.get('/api/rentals', (req, res) => res.json(db.getAllRentals()));
+app.get('/api/rentals', async (req, res) => {
+  try {
+    res.json(await db.getAllRentals());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
-app.post('/api/rentals', requireAuth, upload.single('image'), (req, res) => {
+app.post('/api/rentals', requireAuth, upload.single('image'), async (req, res) => {
   try {
     const { name, seats, tags, whatsapp, display_order } = req.body;
     if (!name) return res.status(400).json({ error: 'Name is required' });
@@ -360,9 +383,9 @@ app.post('/api/rentals', requireAuth, upload.single('image'), (req, res) => {
     let image_path = req.body.existing_image || '';
     if (req.file) image_path = 'uploads/' + req.file.filename;
 
-    db.createRental({
+    await db.createRental({
       name, seats, tags: tags || '[]', image_path,
-      whatsapp: whatsapp || db.getSetting('whatsapp') || '919707386186',
+      whatsapp: whatsapp || await db.getSetting('whatsapp') || '919707386186',
       display_order: parseInt(display_order) || 0
     });
     res.json({ ok: true });
@@ -371,17 +394,17 @@ app.post('/api/rentals', requireAuth, upload.single('image'), (req, res) => {
   }
 });
 
-app.put('/api/rentals/:id', requireAuth, upload.single('image'), (req, res) => {
+app.put('/api/rentals/:id', requireAuth, upload.single('image'), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const existing = db.getRentalById(id);
+    const existing = await db.getRentalById(id);
     if (!existing) return res.status(404).json({ error: 'Rental not found' });
 
     const { name, seats, tags, whatsapp, display_order } = req.body;
     let image_path = req.body.existing_image || existing.image_path;
     if (req.file) image_path = 'uploads/' + req.file.filename;
 
-    db.updateRental(id, {
+    await db.updateRental(id, {
       name, seats, tags: tags || '[]', image_path,
       whatsapp: whatsapp || existing.whatsapp,
       display_order: parseInt(display_order) || 0
@@ -392,9 +415,9 @@ app.put('/api/rentals/:id', requireAuth, upload.single('image'), (req, res) => {
   }
 });
 
-app.delete('/api/rentals/:id', requireAuth, (req, res) => {
+app.delete('/api/rentals/:id', requireAuth, async (req, res) => {
   try {
-    db.deleteRental(parseInt(req.params.id));
+    await db.deleteRental(parseInt(req.params.id));
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -403,23 +426,29 @@ app.delete('/api/rentals/:id', requireAuth, (req, res) => {
 
 // ─── Gallery ──────────────────────────────────────────────────────────────────
 
-app.get('/api/gallery', (req, res) => res.json(db.getAllGallery()));
+app.get('/api/gallery', async (req, res) => {
+  try {
+    res.json(await db.getAllGallery());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
-app.post('/api/gallery', requireAuth, upload.array('images', 20), (req, res) => {
+app.post('/api/gallery', requireAuth, upload.array('images', 20), async (req, res) => {
   try {
     if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'No images uploaded' });
 
     const { alt_text, is_tall } = req.body;
-    let order = db.getAllGallery().length;
+    let order = (await db.getAllGallery()).length;
 
-    req.files.forEach(file => {
-      db.createGalleryItem({
+    for (const file of req.files) {
+      await db.createGalleryItem({
         image_path: 'uploads/' + file.filename,
         alt_text: alt_text || 'Travel photo from Northeast India',
         is_tall: is_tall === 'true' || is_tall === '1' ? 1 : 0,
         display_order: ++order
       });
-    });
+    }
 
     res.json({ ok: true, count: req.files.length });
   } catch (err) {
@@ -427,11 +456,11 @@ app.post('/api/gallery', requireAuth, upload.array('images', 20), (req, res) => 
   }
 });
 
-app.put('/api/gallery/:id', requireAuth, (req, res) => {
+app.put('/api/gallery/:id', requireAuth, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const { alt_text, is_tall, display_order } = req.body;
-    db.updateGalleryItem(id, {
+    await db.updateGalleryItem(id, {
       alt_text: alt_text || '',
       is_tall: is_tall === 'true' || is_tall === '1' ? 1 : 0,
       display_order: parseInt(display_order) || 0
@@ -442,14 +471,14 @@ app.put('/api/gallery/:id', requireAuth, (req, res) => {
   }
 });
 
-app.delete('/api/gallery/:id', requireAuth, (req, res) => {
+app.delete('/api/gallery/:id', requireAuth, async (req, res) => {
   try {
-    const item = db.getGalleryById(parseInt(req.params.id));
+    const item = await db.getGalleryById(parseInt(req.params.id));
     if (item && item.image_path.startsWith('uploads/')) {
       const fullPath = path.join(DATA_DIR, item.image_path);
       if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
     }
-    db.deleteGalleryItem(parseInt(req.params.id));
+    await db.deleteGalleryItem(parseInt(req.params.id));
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -459,15 +488,27 @@ app.delete('/api/gallery/:id', requireAuth, (req, res) => {
 // ─── Testimonials ─────────────────────────────────────────────────────────────
 
 // Public homepage feed — approved reviews only. Never seeded, never faked.
-app.get('/api/testimonials', (req, res) => res.json(db.getApprovedTestimonials()));
+app.get('/api/testimonials', async (req, res) => {
+  try {
+    res.json(await db.getApprovedTestimonials());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // Admin moderation queue — every submission, pending first.
-app.get('/api/testimonials/all', requireAuth, (req, res) => res.json(db.getAllTestimonials()));
+app.get('/api/testimonials/all', requireAuth, async (req, res) => {
+  try {
+    res.json(await db.getAllTestimonials());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // A real visitor submitting the "Write a Review" form on the site.
 // Goes in as pending — nothing reaches the public page until an admin approves it.
 const testimonialSubmitTimestamps = new Map();
-app.post('/api/testimonials/submit', (req, res) => {
+app.post('/api/testimonials/submit', async (req, res) => {
   try {
     const { name, package_name, quote, rating, email, website } = req.body;
 
@@ -489,7 +530,7 @@ app.post('/api/testimonials/submit', (req, res) => {
     }
     testimonialSubmitTimestamps.set(ip, Date.now());
 
-    db.submitTestimonial({
+    await db.submitTestimonial({
       name: name.trim().slice(0, 100),
       package_name: (package_name || '').trim().slice(0, 100),
       quote: quote.trim().slice(0, 1000),
@@ -503,22 +544,22 @@ app.post('/api/testimonials/submit', (req, res) => {
 });
 
 // Admin manually logging a review collected another way (phone, WhatsApp, etc). Goes live immediately.
-app.post('/api/testimonials', requireAuth, (req, res) => {
+app.post('/api/testimonials', requireAuth, async (req, res) => {
   try {
     const { name, package_name, quote, rating, display_order, email } = req.body;
     if (!name || !quote) return res.status(400).json({ error: 'Name and quote are required' });
-    db.createTestimonial({ name, package_name, quote, rating: parseInt(rating) || 5, display_order: parseInt(display_order) || 0, email: email || '' });
+    await db.createTestimonial({ name, package_name, quote, rating: parseInt(rating) || 5, display_order: parseInt(display_order) || 0, email: email || '' });
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.put('/api/testimonials/:id', requireAuth, (req, res) => {
+app.put('/api/testimonials/:id', requireAuth, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const { name, package_name, quote, rating, display_order } = req.body;
-    db.updateTestimonial(id, { name, package_name, quote, rating: parseInt(rating) || 5, display_order: parseInt(display_order) || 0 });
+    await db.updateTestimonial(id, { name, package_name, quote, rating: parseInt(rating) || 5, display_order: parseInt(display_order) || 0 });
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -526,22 +567,22 @@ app.put('/api/testimonials/:id', requireAuth, (req, res) => {
 });
 
 // Approve or reject a pending review.
-app.patch('/api/testimonials/:id/status', requireAuth, (req, res) => {
+app.patch('/api/testimonials/:id/status', requireAuth, async (req, res) => {
   try {
     const { status } = req.body;
     if (!['approved', 'pending', 'rejected'].includes(status)) {
       return res.status(400).json({ error: 'Invalid status' });
     }
-    db.setTestimonialStatus(parseInt(req.params.id), status);
+    await db.setTestimonialStatus(parseInt(req.params.id), status);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.delete('/api/testimonials/:id', requireAuth, (req, res) => {
+app.delete('/api/testimonials/:id', requireAuth, async (req, res) => {
   try {
-    db.deleteTestimonial(parseInt(req.params.id));
+    await db.deleteTestimonial(parseInt(req.params.id));
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -553,7 +594,7 @@ app.delete('/api/testimonials/:id', requireAuth, (req, res) => {
 // A visitor submitting the "Book This Trip" form on a package page.
 // Goes in as pending — an admin confirms it (and reaches out) from the dashboard.
 const bookingSubmitTimestamps = new Map();
-app.post('/api/bookings', (req, res) => {
+app.post('/api/bookings', async (req, res) => {
   try {
     const { name, phone, email, package_slug, package_name, travel_date, group_size, message, website } = req.body;
 
@@ -571,7 +612,7 @@ app.post('/api/bookings', (req, res) => {
     }
     bookingSubmitTimestamps.set(ip, Date.now());
 
-    const result = db.createBooking({
+    const result = await db.createBooking({
       name: name.trim().slice(0, 100),
       phone: phone.trim().slice(0, 30),
       email: (email || '').trim().slice(0, 200),
@@ -587,7 +628,13 @@ app.post('/api/bookings', (req, res) => {
   }
 });
 
-app.get('/api/bookings', requireAuth, (req, res) => res.json(db.getAllBookings()));
+app.get('/api/bookings', requireAuth, async (req, res) => {
+  try {
+    res.json(await db.getAllBookings());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 app.patch('/api/bookings/:id/status', requireAuth, async (req, res) => {
   try {
@@ -617,9 +664,9 @@ app.patch('/api/bookings/:id/status', requireAuth, async (req, res) => {
   }
 });
 
-app.delete('/api/bookings/:id', requireAuth, (req, res) => {
+app.delete('/api/bookings/:id', requireAuth, async (req, res) => {
   try {
-    db.deleteBooking(parseInt(req.params.id));
+    await db.deleteBooking(parseInt(req.params.id));
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -631,7 +678,7 @@ app.delete('/api/bookings/:id', requireAuth, (req, res) => {
 // The homepage contact form. Saved here first so nothing is lost even if the
 // visitor's WhatsApp tap never actually sends (or they don't have it installed).
 const enquirySubmitTimestamps = new Map();
-app.post('/api/enquiries', (req, res) => {
+app.post('/api/enquiries', async (req, res) => {
   try {
     const { name, phone, email, message, source, website } = req.body;
 
@@ -648,7 +695,7 @@ app.post('/api/enquiries', (req, res) => {
     }
     enquirySubmitTimestamps.set(ip, Date.now());
 
-    const result = db.createEnquiry({
+    const result = await db.createEnquiry({
       name: name.trim().slice(0, 100),
       phone: (phone || '').trim().slice(0, 30),
       email: (email || '').trim().slice(0, 200),
@@ -661,23 +708,29 @@ app.post('/api/enquiries', (req, res) => {
   }
 });
 
-app.get('/api/enquiries', requireAuth, (req, res) => res.json(db.getAllEnquiries()));
+app.get('/api/enquiries', requireAuth, async (req, res) => {
+  try {
+    res.json(await db.getAllEnquiries());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
-app.patch('/api/enquiries/:id/status', requireAuth, (req, res) => {
+app.patch('/api/enquiries/:id/status', requireAuth, async (req, res) => {
   try {
     const { status } = req.body;
     const allowed = ['new', 'replied', 'closed'];
     if (!allowed.includes(status)) return res.status(400).json({ error: 'Invalid status' });
-    db.setEnquiryStatus(parseInt(req.params.id), status);
+    await db.setEnquiryStatus(parseInt(req.params.id), status);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.delete('/api/enquiries/:id', requireAuth, (req, res) => {
+app.delete('/api/enquiries/:id', requireAuth, async (req, res) => {
   try {
-    db.deleteEnquiry(parseInt(req.params.id));
+    await db.deleteEnquiry(parseInt(req.params.id));
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -686,9 +739,9 @@ app.delete('/api/enquiries/:id', requireAuth, (req, res) => {
 
 // ─── Analytics ────────────────────────────────────────────────────────────────
 
-app.get('/api/stats', requireAuth, (req, res) => {
+app.get('/api/stats', requireAuth, async (req, res) => {
   try {
-    res.json(db.getStats());
+    res.json(await db.getStats());
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -696,16 +749,22 @@ app.get('/api/stats', requireAuth, (req, res) => {
 
 // ─── Settings ─────────────────────────────────────────────────────────────────
 
-app.get('/api/settings', (req, res) => res.json(db.getAllSettings()));
+app.get('/api/settings', async (req, res) => {
+  try {
+    res.json(await db.getAllSettings());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
-app.put('/api/settings', requireAuth, (req, res) => {
+app.put('/api/settings', requireAuth, async (req, res) => {
   try {
     const allowed = ['phone', 'phone_raw', 'whatsapp', 'email', 'instagram', 'facebook',
                      'base_location', 'stat_destinations',
                      'stat_years', 'stat_rating', 'site_description', 'response_time'];
-    allowed.forEach(key => {
-      if (req.body[key] !== undefined) db.setSetting(key, req.body[key]);
-    });
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) await db.setSetting(key, req.body[key]);
+    }
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
