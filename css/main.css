@@ -25,7 +25,7 @@ section{ position:relative; }
   animation: draw 1.6s var(--ease-in-out) forwards;
 }
 @keyframes draw{ to{ stroke-dashoffset:0; } }
-.loader-bar{ width:160px; height:2px; background: rgba(242,200,121,0.2); overflow:hidden; border-radius:2px; }
+.loader-bar{ width:160px; height:2px; background: rgba(217,190,140,0.2); overflow:hidden; border-radius:2px; }
 .loader-bar span{ display:block; height:100%; width:0%; background: var(--brass-500); animation: load-bar 1.8s var(--ease-in-out) forwards; }
 @keyframes load-bar{ to{ width:100%; } }
 .loader-text{ font-family: var(--font-mono); font-size: var(--fs-2xs); letter-spacing:.24em; color: var(--brass-400); text-transform:uppercase; }
@@ -76,8 +76,8 @@ section{ position:relative; }
   content:"";
   position:absolute; inset:0; z-index:2;
   background:
-    linear-gradient(180deg, rgba(11,18,32,0.55) 0%, rgba(11,18,32,0.35) 40%, rgba(11,18,32,0.92) 100%),
-    linear-gradient(90deg, rgba(11,18,32,0.75) 0%, rgba(11,18,32,0.05) 55%);
+    linear-gradient(180deg, rgba(7,26,23,0.55) 0%, rgba(7,26,23,0.35) 40%, rgba(7,26,23,0.92) 100%),
+    linear-gradient(90deg, rgba(7,26,23,0.75) 0%, rgba(7,26,23,0.05) 55%);
 }
 
 /* ── Floating particles (pure CSS, no JS cost) — a subtle drift of light
@@ -92,8 +92,8 @@ section{ position:relative; }
   bottom:-20px;
   width:4px; height:4px;
   border-radius:50%;
-  background: rgba(242,200,121,0.55);
-  box-shadow: 0 0 8px 2px rgba(242,200,121,0.35);
+  background: rgba(217,190,140,0.55);
+  box-shadow: 0 0 8px 2px rgba(217,190,140,0.35);
   animation: hero-float linear infinite;
 }
 .hero-particles span:nth-child(1){ left:8%;  width:3px; height:3px; animation-duration:16s; animation-delay:0s; }
@@ -128,7 +128,8 @@ section{ position:relative; }
   max-width: 14ch;
   letter-spacing: -0.015em;
 }
-.hero h1 em{ font-style:italic; color: var(--brass-400); }
+h1 em, h2 em, h3 em{ font-style:italic; color: var(--brass-500); }
+.hero h1 em{ color: var(--brass-400); }
 .hero-sub{
   margin-top: var(--sp-4);
   max-width: 46ch;
@@ -146,6 +147,15 @@ section{ position:relative; }
   transition: background var(--dur-med);
 }
 .hero-clip-dots span.is-active{ background: var(--brass-400); }
+
+.hero-locale{
+  position:absolute; bottom: var(--sp-4); left: var(--sp-5);
+  z-index:2;
+  font-family: var(--font-body); font-weight:600; font-size: var(--fs-2xs);
+  color: rgba(244,240,230,0.55);
+  letter-spacing:.15em; text-transform:uppercase;
+}
+@media (max-width: 640px){ .hero-locale{ display:none; } }
 
 .scroll-cue{
   position:absolute; bottom: var(--sp-4); right: var(--sp-5);
@@ -216,6 +226,49 @@ section{ position:relative; }
 .why-card h3{ font-size: var(--fs-lg); margin-bottom: var(--sp-2); }
 .why-card p{ color: var(--slate-500); font-size: var(--fs-sm); }
 
+/* ---------- Experience categories ---------------------------------------------------------- */
+.experiences{ padding-block: var(--sp-8); background: var(--ink); }
+.experiences-grid{
+  display:grid; grid-template-columns: repeat(3,1fr); gap: var(--sp-4);
+}
+.exp-card{
+  position:relative; border-radius: var(--radius-lg); overflow:hidden;
+  aspect-ratio: 4/5; cursor:pointer;
+}
+.exp-card img{
+  position:absolute; inset:0; width:100%; height:100%; object-fit:cover;
+  transition: transform var(--dur-slow) var(--ease-out);
+}
+.exp-card::after{
+  content:""; position:absolute; inset:0;
+  background: linear-gradient(180deg, rgba(7,26,23,0.05) 30%, rgba(7,26,23,0.88) 100%);
+}
+.exp-card:hover img{ transform: scale(1.08); }
+.exp-body{
+  position:absolute; left:0; right:0; bottom:0; z-index:2;
+  padding: var(--sp-4); color: var(--mist-050);
+  transition: transform var(--dur-med) var(--ease-out);
+}
+.exp-card:hover .exp-body{ transform: translateY(-6px); }
+.exp-body .exp-label{
+  font-family: var(--font-body); font-weight:700; font-size: var(--fs-2xs);
+  letter-spacing:.15em; text-transform:uppercase; color: var(--brass-400);
+  margin-bottom:.4em; display:block;
+}
+.exp-body h3{ font-size: var(--fs-lg); margin-bottom:.3em; }
+.exp-body p{ font-size: var(--fs-xs); color: rgba(244,240,230,0.72); margin-bottom:.8em; }
+.exp-body .exp-discover{
+  font-family: var(--font-body); font-weight:700; font-size: var(--fs-2xs);
+  letter-spacing:.1em; text-transform:uppercase; color: var(--mist-050);
+  opacity:0; transform: translateY(6px);
+  transition: all var(--dur-med) var(--ease-out);
+}
+.exp-card:hover .exp-discover{ opacity:1; transform: translateY(0); }
+.exp-discover i{ transition: transform var(--dur-fast) var(--ease-out); }
+.exp-card:hover .exp-discover i{ transform: translateX(4px); }
+@media (max-width: 900px){ .experiences-grid{ grid-template-columns: repeat(2,1fr); } }
+@media (max-width: 640px){ .experiences-grid{ grid-template-columns: 1fr; } }
+
 /* ---------- Stats band --------------------------------------------------------------------- */
 .stats{
   background: var(--forest-800);
@@ -272,6 +325,70 @@ section{ position:relative; }
 .pkg-actions .btn{ width:auto; flex:1; }
 .pkg-actions .btn-map{ flex:0 0 auto; width:auto; padding-left:1.1em; padding-right:1.1em; }
 
+/* ---------- Offbeat ("The Road Less Travelled") --------------------------------------------- */
+.offbeat{ position:relative; padding-block: var(--sp-9); overflow:hidden; }
+.offbeat-media{ position:absolute; inset:0; z-index:0; }
+.offbeat-media img{
+  width:100%; height:100%; object-fit:cover;
+  transform: scale(1.06); transition: transform 6s var(--ease-out);
+}
+.offbeat.is-visible .offbeat-media img{ transform: scale(1); }
+.offbeat-media::after{
+  content:""; position:absolute; inset:0;
+  background: linear-gradient(100deg, rgba(7,26,23,0.86) 0%, rgba(7,26,23,0.5) 55%, rgba(7,26,23,0.35) 100%);
+}
+.offbeat .container{ position:relative; z-index:1; }
+.offbeat-copy{ max-width: 560px; }
+.offbeat-copy .eyebrow{ color: var(--brass-400); }
+.offbeat-copy h2{ color: var(--mist-050); font-size: var(--fs-3xl); margin-block: var(--sp-2); }
+.offbeat-copy p{ color: rgba(244,240,230,0.8); font-size: var(--fs-md); margin-bottom: var(--sp-4); max-width: 460px; }
+
+/* ---------- Journey map teaser -------------------------------------------------------------- */
+.journey-map{ padding-block: var(--sp-8); background: var(--mist-050); }
+.journey-map .container{
+  display:grid; grid-template-columns: 0.85fr 1.15fr; gap: var(--sp-7); align-items:center;
+}
+.journey-map-steps{ list-style:none; padding:0; margin: var(--sp-5) 0; counter-reset: jm; }
+.journey-map-steps li{
+  counter-increment: jm; position:relative; padding-left: 3rem; padding-bottom: var(--sp-4);
+  border-left: 1px solid var(--line-light); margin-left: 14px;
+}
+.journey-map-steps li:last-child{ border-left-color: transparent; padding-bottom:0; }
+.journey-map-steps li::before{
+  content: counter(jm, decimal-leading-zero);
+  position:absolute; left:-15px; top:0;
+  width:30px; height:30px; border-radius:50%;
+  background: var(--forest-800); color: var(--brass-400);
+  font-family: var(--font-body); font-weight:700; font-size: var(--fs-2xs);
+  display:flex; align-items:center; justify-content:center;
+}
+.journey-map-steps li b{ display:block; font-family: var(--font-display); font-size: var(--fs-md); color: var(--slate-700); margin-bottom:.2em; }
+.journey-map-steps li span{ color: var(--slate-500); font-size: var(--fs-sm); }
+.journey-map-media{
+  position:relative; border-radius: var(--radius-lg); overflow:hidden; aspect-ratio: 4/5;
+  box-shadow: var(--shadow-lg); background: var(--mist-100);
+}
+.journey-map-media img.jm-fallback{ width:100%; height:100%; object-fit:cover; display:block; }
+.journey-teaser-map{ position:absolute; inset:0; z-index:1; background:transparent; }
+.journey-teaser-map .leaflet-control-attribution{ display:none; }
+.route-day-pin.is-current{ background: var(--brass-500); color: var(--ink); box-shadow: 0 0 0 4px rgba(200,169,107,0.3); }
+.journey-map-media .jm-badge{
+  position:absolute; bottom: var(--sp-4); left: var(--sp-4); right: var(--sp-4); z-index:2;
+  background: rgba(7,26,23,0.7); backdrop-filter: blur(6px);
+  border-radius: var(--radius-md); padding: var(--sp-3) var(--sp-4);
+  color: var(--mist-050); pointer-events:none;
+}
+.journey-map-media .jm-badge b{ display:block; font-family: var(--font-display); font-size: var(--fs-lg); }
+.journey-map-media .jm-badge span{ font-size: var(--fs-xs); color: rgba(244,240,230,0.75); }
+.journey-map-steps li{ transition: opacity var(--dur-med) var(--ease-out); opacity:.55; }
+.journey-map-steps li.is-active{ opacity:1; }
+.journey-map-steps li.is-active::before{ background: var(--brass-500); color: var(--ink); }
+.journey-map-steps li.is-active b{ color: var(--brass-600); }
+@media (max-width: 900px){
+  .journey-map .container{ grid-template-columns: 1fr; }
+  .journey-map-media{ order:-1; aspect-ratio: 16/10; }
+}
+
 /* ---------- Vehicles ------------------------------------------------------------------------- */
 .rentals{ padding-block: var(--sp-8); background: var(--paper); }
 .rentals-grid{ display:grid; grid-template-columns: repeat(4,1fr); gap: var(--sp-4); }
@@ -304,14 +421,24 @@ section{ position:relative; }
   position:absolute; inset:0;
   display:flex; align-items:center; justify-content:center;
   color:#fff; font-size:1.1rem;
-  background: rgba(11,18,32,0.45);
+  background: rgba(7,26,23,0.45);
   opacity:0; transition: opacity var(--dur-fast);
 }
 .g-item:hover::after{ opacity:1; }
+.g-location{
+  position:absolute; left: var(--sp-2); bottom: var(--sp-2); z-index:2;
+  font-family: var(--font-body); font-weight:600; font-size: var(--fs-2xs);
+  letter-spacing:.04em; color: var(--mist-050);
+  display:flex; align-items:center; gap:.4em;
+  opacity:0; transform: translateY(6px);
+  transition: all var(--dur-med) var(--ease-out);
+}
+.g-location i{ color: var(--brass-400); }
+.g-item:hover .g-location{ opacity:1; transform: translateY(0); }
 
 .lightbox{
   position:fixed; inset:0; z-index: var(--z-lightbox);
-  background: rgba(11,18,32,0.94);
+  background: rgba(7,26,23,0.94);
   display:flex; align-items:center; justify-content:center;
   opacity:0; visibility:hidden; transition: opacity var(--dur-med);
   padding: var(--sp-5);
@@ -383,7 +510,7 @@ section{ position:relative; }
   opacity:0; visibility:hidden; transition: opacity var(--dur-med);
 }
 .review-modal.is-open{ opacity:1; visibility:visible; }
-.review-modal-backdrop{ position:absolute; inset:0; background: rgba(11,18,32,0.55); backdrop-filter: blur(4px); }
+.review-modal-backdrop{ position:absolute; inset:0; background: rgba(7,26,23,0.55); backdrop-filter: blur(4px); }
 .review-modal-panel{
   position:relative; width:100%; max-width:520px; max-height:88vh; overflow-y:auto;
   background: var(--paper); border-radius: var(--radius-md); box-shadow: var(--shadow-lg);
@@ -417,7 +544,7 @@ section{ position:relative; }
 .contact-info-item i{
   width:44px; height:44px; border-radius:50%;
   display:flex; align-items:center; justify-content:center;
-  background: rgba(242,200,121,0.12); color: var(--brass-400); flex-shrink:0;
+  background: rgba(217,190,140,0.12); color: var(--brass-400); flex-shrink:0;
 }
 .contact-info-item b{ display:block; color: var(--mist-050); font-size: var(--fs-sm); margin-bottom:.2em; }
 .contact-info-item span, .contact-info-item a{ color: rgba(243,246,241,0.68); font-size: var(--fs-sm); }
@@ -427,6 +554,20 @@ section{ position:relative; }
   background: rgba(252,253,251,0.06); border-color: var(--line-dark); color: var(--mist-050);
 }
 .contact-form .field input::placeholder, .contact-form .field textarea::placeholder{ color: rgba(243,246,241,0.35); }
+
+/* ---------- Final cinematic CTA ------------------------------------------------------------- */
+.cinematic-cta{ position:relative; padding-block: var(--sp-9); overflow:hidden; text-align:center; }
+.cinematic-cta-media{ position:absolute; inset:0; z-index:0; }
+.cinematic-cta-media img{
+  width:100%; height:100%; object-fit:cover;
+  transform: scale(1.06); transition: transform 6s var(--ease-out);
+}
+.cinematic-cta.is-visible .cinematic-cta-media img{ transform: scale(1); }
+.cinematic-cta-media::after{ content:""; position:absolute; inset:0; background: rgba(7,26,23,0.6); }
+.cinematic-cta .container{ position:relative; z-index:1; }
+.cinematic-cta h2{ color: var(--mist-050); font-size: var(--fs-3xl); margin-bottom: var(--sp-2); }
+.cinematic-cta p{ color: rgba(244,240,230,0.82); font-size: var(--fs-md); margin-bottom: var(--sp-5); }
+.cinematic-cta .btn{ margin-inline:auto; }
 
 /* ---------- Package detail page --------------------------------------------------------------------
    Shared by the static destination pages (package-bhutan.html etc.) AND the
@@ -616,7 +757,7 @@ section{ position:relative; }
 .tb-modal-overlay{
   position:fixed; inset:0; z-index: var(--z-lightbox);
   display:flex; align-items:center; justify-content:center; padding: var(--sp-4);
-  opacity:0; visibility:hidden; background: rgba(11,18,32,0.55); backdrop-filter: blur(4px);
+  opacity:0; visibility:hidden; background: rgba(7,26,23,0.55); backdrop-filter: blur(4px);
   transition: opacity var(--dur-med);
 }
 .tb-modal-overlay.is-open{ opacity:1; visibility:visible; }
@@ -648,7 +789,7 @@ section{ position:relative; }
   transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
 }
 #tb-booking-form input:focus, #tb-booking-form textarea:focus{
-  outline:none; border-color: var(--brass-500); box-shadow: 0 0 0 4px rgba(224,167,62,0.15);
+  outline:none; border-color: var(--brass-500); box-shadow: 0 0 0 4px rgba(200,169,107,0.15);
 }
 #tb-booking-form textarea{ resize:vertical; min-height:90px; }
 .tb-modal-row{ display:grid; grid-template-columns:1fr 1fr; gap: var(--sp-3); }

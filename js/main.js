@@ -467,6 +467,7 @@
       const dest = data.get("destination") || "";
       const dates = data.get("dates") || "";
       const travelers = data.get("travelers") || "";
+      const tripType = data.get("trip_type") || "";
       const msg = data.get("message") || "";
 
       const submitBtn = form.querySelector('button[type="submit"]');
@@ -478,7 +479,7 @@
 
       const enquiryMessage =
         `Destination: ${dest || "—"}. Travel dates: ${dates || "—"}. ` +
-        `Travelers: ${travelers || "—"}. Notes: ${msg || "—"}`;
+        `Travelers: ${travelers || "—"}. Trip type: ${tripType || "—"}. Notes: ${msg || "—"}`;
 
       fetch("/api/enquiries", {
         method: "POST",
@@ -499,8 +500,8 @@
           const text =
             `Hi Touring Buddiez! I'd like to plan a trip.%0A` +
             `Name: ${enc(name)}%0APhone: ${enc(phone)}%0ADestination: ${enc(dest)}%0A` +
-            `Travel dates: ${enc(dates)}%0ATravelers: ${enc(travelers)}%0ANotes: ${enc(msg)}`;
-          window.open(`https://wa.me/916002816370?text=${text}`, "_blank");
+            `Travel dates: ${enc(dates)}%0ATravelers: ${enc(travelers)}%0ATrip type: ${enc(tripType)}%0ANotes: ${enc(msg)}`;
+          window.open(`https://wa.me/919707386186?text=${text}`, "_blank");
           form.reset();
           if (submitBtn) {
             submitBtn.disabled = false;

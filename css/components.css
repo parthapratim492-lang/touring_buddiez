@@ -40,7 +40,7 @@ h1,h2,h3,h4{ font-family: var(--font-display); line-height: var(--lh-tight); fon
 }
 
 /* ---------- Section heading pattern ---------------------------------------
-   eyebrow (mono, tracked-out) + Fraunces title. Used identically across
+   eyebrow (uppercase, tracked-out) + Playfair Display title. Used identically across
    every section so rhythm reads consistent top-to-bottom. */
 .section-head{
   max-width: 640px;
@@ -100,6 +100,11 @@ h1,h2,h3,h4{ font-family: var(--font-display); line-height: var(--lh-tight); fon
 }
 .btn:active{ transform: scale(.97); }
 
+/* Signature motion: trailing arrow icon slides right on hover, in step with
+   the site-wide "arrow slides right" language used on cards and links. */
+.btn i.fa-arrow-right{ transition: transform var(--dur-fast) var(--ease-out); }
+.btn:hover i.fa-arrow-right{ transform: translateX(4px); }
+
 .btn-primary{
   background: var(--brass-500);
   color: var(--ink);
@@ -119,7 +124,7 @@ h1,h2,h3,h4{ font-family: var(--font-display); line-height: var(--lh-tight); fon
   border: 1.5px solid var(--line-light);
 }
 .on-dark .btn-ghost{ border-color: var(--line-dark); color: var(--mist-050); }
-.btn-ghost:hover{ border-color: var(--brass-500); background: rgba(224,167,62,0.08); }
+.btn-ghost:hover{ border-color: var(--brass-500); background: rgba(200,169,107,0.08); }
 
 .btn-sm{ padding: .8em 1.5em; font-size: var(--fs-xs); }
 
@@ -170,7 +175,7 @@ h1,h2,h3,h4{ font-family: var(--font-display); line-height: var(--lh-tight); fon
   animation: ripple 650ms var(--ease-out);
   z-index:-1;
 }
-.btn-ghost .ripple, .btn-dark .ripple{ background: rgba(224,167,62,0.35); }
+.btn-ghost .ripple, .btn-dark .ripple{ background: rgba(200,169,107,0.35); }
 @keyframes ripple{ to{ transform: scale(3.2); opacity:0; } }
 
 /* ---------- Cards ------------------------------------------------------------ */
@@ -209,7 +214,7 @@ h1,h2,h3,h4{ font-family: var(--font-display); line-height: var(--lh-tight); fon
   background: rgba(252,253,251,0.72);
   backdrop-filter: blur(14px) saturate(140%);
   -webkit-backdrop-filter: blur(14px) saturate(140%);
-  border: 1px solid rgba(22,41,75,0.08);
+  border: 1px solid rgba(23,58,49,0.08);
 }
 
 /* ---------- Badges ----------------------------------------------------------- */
@@ -240,10 +245,10 @@ h1,h2,h3,h4{ font-family: var(--font-display); line-height: var(--lh-tight); fon
 .nav .container{ display:flex; align-items:center; justify-content:space-between; gap: var(--sp-4); }
 .nav.is-scrolled{
   height: var(--nav-h-scrolled);
-  background: rgba(11,18,32,0.82);
+  background: rgba(7,26,23,0.82);
   backdrop-filter: blur(16px) saturate(140%);
   -webkit-backdrop-filter: blur(16px) saturate(140%);
-  border-bottom-color: rgba(242,200,121,0.14);
+  border-bottom-color: rgba(217,190,140,0.14);
   box-shadow: var(--shadow-md);
 }
 .nav-logo{ display:flex; align-items:center; gap:.7em; }
@@ -368,7 +373,7 @@ h1,h2,h3,h4{ font-family: var(--font-display); line-height: var(--lh-tight); fon
 }
 .field input:focus, .field select:focus, .field textarea:focus{
   border-color: var(--brass-500);
-  box-shadow: 0 0 0 4px rgba(224,167,62,0.15);
+  box-shadow: 0 0 0 4px rgba(200,169,107,0.15);
   outline:none;
 }
 .field textarea{ resize: vertical; min-height:110px; }
@@ -427,7 +432,7 @@ h1,h2,h3,h4{ font-family: var(--font-display); line-height: var(--lh-tight); fon
 .subpage-hero::after{
   content:"";
   position:absolute; inset:0;
-  background: linear-gradient(180deg, rgba(11,18,32,.35) 0%, rgba(11,18,32,.75) 100%);
+  background: linear-gradient(180deg, rgba(7,26,23,.35) 0%, rgba(7,26,23,.75) 100%);
 }
 .subpage-hero-content{
   position:relative;

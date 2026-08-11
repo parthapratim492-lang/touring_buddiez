@@ -192,6 +192,7 @@
     grid.innerHTML = items.map(item => `
       <div class="g-item${item.is_tall ? ' tall' : ''}">
         <img src="/${item.image_path}" alt="${esc(item.alt_text || 'Travel photo')}" loading="lazy">
+        ${item.location ? `<span class="g-location"><i class="fa-solid fa-location-dot"></i> ${esc(item.location)}</span>` : ''}
       </div>
     `).join('');
   }

@@ -438,13 +438,14 @@ app.post('/api/gallery', requireAuth, upload.array('images', 20), async (req, re
   try {
     if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'No images uploaded' });
 
-    const { alt_text, is_tall } = req.body;
+    const { alt_text, is_tall, location } = req.body;
     let order = (await db.getAllGallery()).length;
 
     for (const file of req.files) {
       await db.createGalleryItem({
         image_path: 'uploads/' + file.filename,
         alt_text: alt_text || 'Travel photo from Northeast India',
+        location: location || '',
         is_tall: is_tall === 'true' || is_tall === '1' ? 1 : 0,
         display_order: ++order
       });
@@ -459,9 +460,10 @@ app.post('/api/gallery', requireAuth, upload.array('images', 20), async (req, re
 app.put('/api/gallery/:id', requireAuth, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const { alt_text, is_tall, display_order } = req.body;
+    const { alt_text, is_tall, display_order, location } = req.body;
     await db.updateGalleryItem(id, {
       alt_text: alt_text || '',
+      location: location || '',
       is_tall: is_tall === 'true' || is_tall === '1' ? 1 : 0,
       display_order: parseInt(display_order) || 0
     });

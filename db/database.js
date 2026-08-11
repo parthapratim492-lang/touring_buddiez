@@ -95,6 +95,7 @@ const GallerySchema = new mongoose.Schema({
   id: { type: Number, unique: true },
   image_path: { type: String, required: true },
   alt_text: String,
+  location: String,
   is_tall: { type: Number, default: 0 },
   display_order: { type: Number, default: 0 },
   created_at: { type: String, default: () => new Date().toISOString() }

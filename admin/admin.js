@@ -1110,7 +1110,11 @@ function renderGalleryGrid() {
     <div class="gallery-admin-item">
       <img src="/${item.image_path}" alt="${esc(item.alt_text)}" loading="lazy">
       ${item.is_tall ? '<span class="tall-badge">TALL</span>' : ''}
+      ${item.location ? `<span class="location-badge"><i class="fa-solid fa-location-dot"></i> ${esc(item.location)}</span>` : ''}
       <div class="item-overlay">
+        <button class="overlay-btn" onclick="editGalleryItem(${item.id})" title="Edit alt text & location">
+          <i class="fa-solid fa-pen"></i>
+        </button>
         <button class="overlay-btn tall-toggle" onclick="toggleTall(${item.id}, ${item.is_tall})" title="${item.is_tall ? 'Remove tall' : 'Mark tall'}">
           <i class="fa-solid fa-up-down"></i>
         </button>
@@ -1120,6 +1124,42 @@ function renderGalleryGrid() {
       </div>
     </div>
   `).join('');
+}
+
+function editGalleryItem(id) {
+  const item = allGallery.find(g => g.id === id);
+  if (!item) return;
+  const html = `
+    <form id="gallery-edit-form">
+      <div class="field">
+        <label for="gal-edit-alt">Alt Text</label>
+        <input type="text" id="gal-edit-alt" value="${esc(item.alt_text || '')}" placeholder="Description of the photo">
+      </div>
+      <div class="field">
+        <label for="gal-edit-location">Location <span style="opacity:.6;font-weight:400;">(shown on hover on the homepage)</span></label>
+        <input type="text" id="gal-edit-location" value="${esc(item.location || '')}" placeholder="e.g. Anini, Arunachal Pradesh">
+      </div>
+      <div style="display:flex;gap:.75rem;margin-top:.5rem">
+        <button type="submit" class="btn-primary">Save</button>
+        <button type="button" class="btn-secondary" onclick="closeModal()">Cancel</button>
+      </div>
+    </form>
+  `;
+  openModal('Edit Photo', html);
+  document.getElementById('gallery-edit-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      await api('PUT', `/api/gallery/${id}`, {
+        alt_text: document.getElementById('gal-edit-alt').value,
+        location: document.getElementById('gal-edit-location').value,
+        is_tall: item.is_tall ? 'true' : 'false',
+        display_order: item.display_order || 0
+      });
+      toast('Photo updated');
+      closeModal();
+      loadGallery();
+    } catch (ex) { toast('Error: ' + ex.message, true); }
+  });
 }
 
 function openGalleryUpload() {
@@ -1139,6 +1179,10 @@ function openGalleryUpload() {
       <div class="field">
         <label for="gal-alt">Alt Text (for accessibility & SEO)</label>
         <input type="text" id="gal-alt" value="Travel photo from Northeast India" placeholder="Description of the photo">
+      </div>
+      <div class="field">
+        <label for="gal-location">Location <span style="opacity:.6;font-weight:400;">(optional — shown on hover on the homepage; applies to every photo in this batch)</span></label>
+        <input type="text" id="gal-location" placeholder="e.g. Anini, Arunachal Pradesh">
       </div>
       <div style="display:flex;gap:.75rem;margin-top:.5rem">
         <button type="submit" class="btn-primary" id="gal-submit"><i class="fa-solid fa-upload"></i> Upload Photos</button>
@@ -1167,6 +1211,7 @@ function openGalleryUpload() {
     const fd = new FormData();
     Array.from(files).forEach(f => fd.append('images', f));
     fd.append('alt_text', document.getElementById('gal-alt').value);
+    fd.append('location', document.getElementById('gal-location').value);
 
     const btn = document.getElementById('gal-submit');
     btn.innerHTML = '<span class="spinner"></span> Uploading...';
@@ -1188,7 +1233,7 @@ function openGalleryUpload() {
 async function toggleTall(id, currentIsTall) {
   try {
     const item = allGallery.find(g => g.id === id);
-    await api('PUT', `/api/gallery/${id}`, { alt_text: item?.alt_text || '', is_tall: currentIsTall ? 'false' : 'true', display_order: item?.display_order || 0 });
+    await api('PUT', `/api/gallery/${id}`, { alt_text: item?.alt_text || '', location: item?.location || '', is_tall: currentIsTall ? 'false' : 'true', display_order: item?.display_order || 0 });
     loadGallery();
   } catch (ex) { toast('Error: ' + ex.message, true); }
 }
