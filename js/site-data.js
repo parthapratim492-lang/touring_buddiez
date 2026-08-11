@@ -47,6 +47,7 @@
     if (packages && packages.length) renderHomePackages(packages, settings);
     if (rentals && rentals.length) renderRentals(rentals, settings);
     if (gallery && gallery.length) renderGallery(gallery);
+    if (window.__initGallerySlideshow) window.__initGallerySlideshow();
     renderTestimonials(testimonials || []);
   }
 

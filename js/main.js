@@ -83,12 +83,16 @@
   }
 
   /* ---------------------------------------------------------------------
-     3. CUSTOM CURSOR (desktop only)
+     3. CUSTOM CURSOR (desktop only) — a small dot everywhere, growing into
+     a circle with a "VIEW"/"EXPLORE" label over large images specifically.
   --------------------------------------------------------------------- */
   function initCursor() {
     if (isTouch || reduceMotion) return;
     const dot = document.createElement("div");
     dot.className = "cursor-dot";
+    const label = document.createElement("span");
+    label.className = "cursor-dot-label";
+    dot.appendChild(label);
     document.body.appendChild(dot);
 
     let x = 0, y = 0, cx = 0, cy = 0;
@@ -106,6 +110,74 @@
     });
     document.addEventListener("mouseout", (e) => {
       if (e.target.closest(hoverables)) dot.classList.remove("is-hover");
+    });
+
+    // Large-image hover: swap the small dot for a bigger circle with a
+    // short label, so a big photo invites a click instead of just sitting
+    // there passively.
+    const imageTargets = [
+      { sel: ".pkg-card .media-zoom, .veh-card .media-zoom", text: "View" },
+      { sel: ".g-item", text: "View" },
+      { sel: ".exp-card", text: "Explore" },
+      { sel: ".offbeat-media, .cinematic-cta-media", text: "Explore" }
+    ];
+    document.addEventListener("mouseover", (e) => {
+      for (const t of imageTargets) {
+        if (e.target.closest(t.sel)) {
+          label.textContent = t.text;
+          dot.classList.add("is-image");
+          return;
+        }
+      }
+    });
+    document.addEventListener("mouseout", (e) => {
+      for (const t of imageTargets) {
+        if (e.target.closest(t.sel)) { dot.classList.remove("is-image"); return; }
+      }
+    });
+  }
+
+  /* ---------------------------------------------------------------------
+     3b. MAGNETIC BUTTONS (desktop only) — primary CTAs nudge 3-5px toward
+     the cursor on hover. Deliberately tiny; the user should barely notice.
+  --------------------------------------------------------------------- */
+  function initMagneticButtons() {
+    if (isTouch || reduceMotion) return;
+    const targets = document.querySelectorAll(".btn-primary");
+    const MAX = 5;
+    targets.forEach((btn) => {
+      btn.addEventListener("mousemove", (e) => {
+        const r = btn.getBoundingClientRect();
+        const relX = (e.clientX - r.left) / r.width - 0.5;
+        const relY = (e.clientY - r.top) / r.height - 0.5;
+        // -2px keeps the existing CSS hover-lift feel instead of the JS
+        // transform silently overriding it (inline styles win over :hover).
+        btn.style.transform = `translate(${relX * MAX * 2}px, ${relY * MAX * 2 - 2}px)`;
+      });
+      btn.addEventListener("mouseleave", () => { btn.style.transform = ""; });
+    });
+  }
+
+  /* ---------------------------------------------------------------------
+     3c. PAGE TRANSITION — opening a destination page feels like the next
+     chapter of the journey rather than an instant swap. A dark overlay
+     fades in, then the browser navigates. Skipped entirely for
+     reduced-motion (instant navigation) and never hijacks new-tab clicks
+     (middle-click, ctrl/cmd-click, or target="_blank").
+  --------------------------------------------------------------------- */
+  function initPageTransition() {
+    const overlay = document.querySelector(".page-transition");
+    if (!overlay || reduceMotion) return;
+
+    document.addEventListener("click", (e) => {
+      const link = e.target.closest('a[href*="package-detail.html"]');
+      if (!link) return;
+      if (link.target === "_blank" || e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
+
+      const href = link.href;
+      e.preventDefault();
+      overlay.classList.add("is-active");
+      setTimeout(() => { window.location.href = href; }, 550);
     });
   }
 
@@ -248,9 +320,10 @@
 
   /* ---------------------------------------------------------------------
      8b. HERO VIDEO SEQUENCE — plays hero1 → hero2 → hero3 → loop,
-     crossfading between clips. Falls back to the poster image on very
-     slow connections or if data-saver is on, so no one is forced to
-     download three video files on a bad signal.
+     crossfading between clips. On very slow connections or data-saver,
+     falls back to a lightweight photo slideshow instead (same crossfade
+     feel, far less bandwidth than three videos). Reduced-motion users get
+     a single still photo with no cycling at all, full stop.
   --------------------------------------------------------------------- */
   function initHeroVideo() {
     const media = document.getElementById("hero-media");
@@ -260,8 +333,10 @@
 
     const conn = navigator.connection || navigator.webkitConnection || navigator.mozConnection;
     const dataSaver = conn && (conn.saveData || /2g/.test(conn.effectiveType || ""));
+
     if (dataSaver || reduceMotion) {
       media.classList.add("no-video");
+      if (!reduceMotion) initHeroPhotoSlideshow(media); // data-saver only, not reduced-motion
       return;
     }
 
@@ -283,37 +358,131 @@
         current = (i + 1) % videos.length;
         activate(current);
       });
+      // If a clip errors out entirely (unsupported codec, failed fetch,
+      // etc.) fall back to the photo slideshow rather than showing nothing.
+      v.addEventListener("error", () => {
+        media.classList.add("no-video");
+        initHeroPhotoSlideshow(media);
+      });
     });
 
     activate(0);
   }
 
+  function initHeroPhotoSlideshow(media) {
+    if (media.dataset.slideshowRunning) return;
+    media.dataset.slideshowRunning = "true";
+    const photos = [...media.querySelectorAll(".hero-fallback")];
+    if (photos.length < 2) return;
+    let i = photos.findIndex((p) => p.classList.contains("is-active"));
+    if (i < 0) i = 0;
+    setInterval(() => {
+      photos[i].classList.remove("is-active");
+      i = (i + 1) % photos.length;
+      photos[i].classList.add("is-active");
+    }, 6000);
+  }
+
   /* ---------------------------------------------------------------------
-     9. GALLERY LIGHTBOX
+     9. GALLERY SLIDESHOW — click any photo to open a full slideshow across
+     every photo in the gallery (not just the ones visible on screen).
+     Arrow keys / on-screen arrows / swipe to navigate, plus a play/pause
+     toggle for a gentle auto-advance. Re-initialized after site-data.js
+     injects the gallery photos (see window.__initGallerySlideshow below),
+     since that content loads asynchronously after this file first runs —
+     slides/index/playing live in this outer scope (not re-created per
+     call) so the nav controls, wired only once, always read current data.
   --------------------------------------------------------------------- */
+  let slideshowTimer = null;
+  let gsSlides = [];
+  let gsIndex = 0;
+  let gsPlaying = false;
+
   function initLightbox() {
-    const items = document.querySelectorAll(".g-item");
+    const items = [...document.querySelectorAll(".g-item")];
     const lightbox = document.querySelector(".lightbox");
     if (!items.length || !lightbox) return;
+
     const img = lightbox.querySelector("img");
     const close = lightbox.querySelector(".lightbox-close");
+    const prevBtn = lightbox.querySelector(".lightbox-prev");
+    const nextBtn = lightbox.querySelector(".lightbox-next");
+    const playBtn = lightbox.querySelector(".lightbox-play");
+    const counter = lightbox.querySelector(".lightbox-counter");
 
-    items.forEach((item) => {
+    // Refresh the shared slide list every time this runs (static fallback
+    // markup first, then the real photos once site-data.js loads them).
+    gsSlides = items.map((item) => {
+      const im = item.querySelector("img");
+      return { src: im.src, alt: im.alt };
+    });
+
+    const show = (i) => {
+      gsIndex = (i + gsSlides.length) % gsSlides.length;
+      const s = gsSlides[gsIndex];
+      img.src = s.src;
+      img.alt = s.alt;
+      if (counter) counter.textContent = `${gsIndex + 1} / ${gsSlides.length}`;
+    };
+
+    const stopPlaying = () => {
+      gsPlaying = false;
+      if (slideshowTimer) clearInterval(slideshowTimer);
+      if (playBtn) playBtn.classList.remove("is-playing");
+    };
+    const startPlaying = () => {
+      if (reduceMotion) return; // no auto-advance for reduced-motion users
+      gsPlaying = true;
+      if (playBtn) playBtn.classList.add("is-playing");
+      slideshowTimer = setInterval(() => show(gsIndex + 1), 3500);
+    };
+
+    items.forEach((item, i) => {
       item.addEventListener("click", () => {
-        img.src = item.querySelector("img").src;
-        img.alt = item.querySelector("img").alt;
+        show(i);
         lightbox.classList.add("is-open");
         document.body.classList.add("no-scroll");
       });
     });
+
+    // The lightbox chrome itself (close/prev/next/play/keyboard/swipe) only
+    // needs wiring once — re-attaching on the second call (after dynamic
+    // gallery load) would double-fire every action. It's safe to wire once
+    // here because show/stopPlaying/startPlaying always read the shared
+    // gsSlides/gsIndex/gsPlaying above, which this function keeps current.
+    if (lightbox.dataset.wired) return;
+    lightbox.dataset.wired = "true";
+
     const closeFn = () => {
       lightbox.classList.remove("is-open");
       document.body.classList.remove("no-scroll");
+      stopPlaying();
     };
+
     close.addEventListener("click", closeFn);
     lightbox.addEventListener("click", (e) => { if (e.target === lightbox) closeFn(); });
-    document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeFn(); });
+    if (prevBtn) prevBtn.addEventListener("click", () => { stopPlaying(); show(gsIndex - 1); });
+    if (nextBtn) nextBtn.addEventListener("click", () => { stopPlaying(); show(gsIndex + 1); });
+    if (playBtn) playBtn.addEventListener("click", () => (gsPlaying ? stopPlaying() : startPlaying()));
+
+    document.addEventListener("keydown", (e) => {
+      if (!lightbox.classList.contains("is-open")) return;
+      if (e.key === "Escape") closeFn();
+      if (e.key === "ArrowRight") { stopPlaying(); show(gsIndex + 1); }
+      if (e.key === "ArrowLeft") { stopPlaying(); show(gsIndex - 1); }
+    });
+
+    // Basic swipe support for touch devices.
+    let touchStartX = null;
+    lightbox.addEventListener("touchstart", (e) => { touchStartX = e.touches[0].clientX; }, { passive: true });
+    lightbox.addEventListener("touchend", (e) => {
+      if (touchStartX === null) return;
+      const dx = e.changedTouches[0].clientX - touchStartX;
+      if (Math.abs(dx) > 40) { stopPlaying(); show(gsIndex + (dx < 0 ? 1 : -1)); }
+      touchStartX = null;
+    }, { passive: true });
   }
+  window.__initGallerySlideshow = initLightbox;
 
   /* ---------------------------------------------------------------------
      10. TESTIMONIAL SLIDER
@@ -519,6 +688,8 @@
     initLoader();
     initNav();
     initCursor();
+    initMagneticButtons();
+    initPageTransition();
     initReveal();
     initCounters();
     initTilt();

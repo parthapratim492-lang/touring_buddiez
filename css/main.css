@@ -41,6 +41,26 @@ section{ position:relative; }
   mix-blend-mode: difference;
 }
 .cursor-dot.is-hover{ width:44px; height:44px; background: var(--brass-400); }
+.cursor-dot-label{
+  position:absolute; top:50%; left:50%; transform: translate(-50%,-50%);
+  font-family: var(--font-body); font-weight:700; font-size: var(--fs-2xs);
+  letter-spacing:.08em; text-transform:uppercase; color: var(--ink);
+  opacity:0; white-space:nowrap; pointer-events:none;
+}
+.cursor-dot.is-image{
+  width:64px; height:64px; background: var(--brass-500);
+  mix-blend-mode: normal; box-shadow: var(--shadow-md);
+}
+.cursor-dot.is-image .cursor-dot-label{ opacity:1; }
+
+/* ---------- Page transition (chapter-turn effect into package pages) ------------------------ */
+.page-transition{
+  position:fixed; inset:0; z-index: var(--z-loader);
+  background: var(--ink);
+  opacity:0; pointer-events:none;
+  transition: opacity 550ms var(--ease-in-out);
+}
+.page-transition.is-active{ opacity:1; pointer-events:all; }
 
 /* ---------- Contour texture (signature ambient background) ---------------------------- */
 .contours{
@@ -69,9 +89,12 @@ section{ position:relative; }
 .hero-fallback{ z-index:0; } /* immediate paint + true fallback if <video> is unsupported */
 .hero-video{ z-index:1; }
 .hero-video.is-active{ opacity:1; }
-/* data-saver / very slow connections: JS adds this to skip video entirely */
+/* data-saver / very slow connections: JS adds this to skip video entirely.
+   Only the .is-active fallback photo shows — for reduced-motion users this
+   stays on the first photo forever (JS never cycles it); otherwise JS
+   crossfades between them as a lightweight slideshow. */
 .hero-media.no-video .hero-video{ display:none; }
-.hero-media.no-video .hero-fallback{ opacity:1; }
+.hero-media.no-video .hero-fallback.is-active{ opacity:1; }
 .hero-media::after{
   content:"";
   position:absolute; inset:0; z-index:2;
@@ -453,6 +476,43 @@ h1 em, h2 em, h3 em{ font-style:italic; color: var(--brass-500); }
   border: 1px solid var(--line-dark);
 }
 .lightbox-close:hover{ background: var(--brass-500); color: var(--ink); }
+
+.lightbox-prev, .lightbox-next{
+  position:absolute; top:50%; transform: translateY(-50%);
+  width:48px; height:48px; border-radius:50%;
+  color:#fff; font-size:1.2rem;
+  display:flex; align-items:center; justify-content:center;
+  border: 1px solid var(--line-dark); background: rgba(7,26,23,0.4);
+  transition: all var(--dur-fast) var(--ease-out);
+}
+.lightbox-prev{ left: var(--sp-4); }
+.lightbox-next{ right: var(--sp-4); }
+.lightbox-prev:hover, .lightbox-next:hover{ background: var(--brass-500); color: var(--ink); transform: translateY(-50%) scale(1.06); }
+@media (max-width: 640px){
+  .lightbox-prev, .lightbox-next{ width:38px; height:38px; font-size:1rem; }
+  .lightbox-prev{ left: var(--sp-2); }
+  .lightbox-next{ right: var(--sp-2); }
+}
+
+.lightbox-bar{
+  position:absolute; left:50%; bottom: var(--sp-4); transform: translateX(-50%);
+  display:flex; align-items:center; gap: var(--sp-3);
+  background: rgba(7,26,23,0.55); backdrop-filter: blur(6px);
+  border-radius: var(--radius-pill); padding: .5em 1em;
+  border: 1px solid var(--line-dark);
+}
+.lightbox-play{
+  width:30px; height:30px; border-radius:50%; color:#fff; font-size:.8rem;
+  display:flex; align-items:center; justify-content:center;
+}
+.lightbox-play:hover{ background: var(--brass-500); color: var(--ink); }
+.lightbox-play .fa-pause{ display:none; }
+.lightbox-play.is-playing .fa-play{ display:none; }
+.lightbox-play.is-playing .fa-pause{ display:inline; }
+.lightbox-counter{
+  font-family: var(--font-body); font-weight:600; font-size: var(--fs-xs);
+  color: rgba(244,240,230,0.85); letter-spacing:.05em;
+}
 
 /* ---------- Testimonials ------------------------------------------------------------------------- */
 .testimonials{ padding-block: var(--sp-8); background: var(--mist-050); }

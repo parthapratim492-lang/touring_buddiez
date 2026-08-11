@@ -73,6 +73,8 @@
   <div class="loader-text">Touring Buddiez</div>
 </div>
 
+<div class="page-transition" aria-hidden="true"></div>
+
 <!-- ===================== NAV ===================== -->
 <nav class="nav">
   <div class="container">
@@ -118,7 +120,11 @@
     <video class="hero-video" muted loop playsinline preload="none" data-index="2">
       <source src="assets/hero/video/hero3.mp4" type="video/mp4">
     </video>
-    <img class="hero-fallback" src="assets/hero/poster.jpg" alt="Misty hills of Northeast India">
+    <img class="hero-fallback is-active" src="assets/hero/poster.jpg" alt="Misty hills of Northeast India">
+    <img class="hero-fallback" src="assets/destinations/meghalaya.jpg" alt="Living root bridges and waterfalls, Meghalaya">
+    <img class="hero-fallback" src="assets/destinations/sikkim.jpg" alt="High-altitude lakes and monasteries, Sikkim">
+    <img class="hero-fallback" src="assets/destinations/anini.jpg" alt="Remote roads through the Dibang Valley, Arunachal Pradesh">
+    <img class="hero-fallback" src="assets/destinations/dong.jpg" alt="Sunrise over Dong Valley, Arunachal Pradesh">
   </div>
   <div class="hero-particles" aria-hidden="true">
     <span></span><span></span><span></span><span></span>
@@ -524,7 +530,13 @@
 
 <div class="lightbox">
   <button class="lightbox-close" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+  <button class="lightbox-prev" aria-label="Previous photo"><i class="fa-solid fa-chevron-left"></i></button>
   <img src="" alt="">
+  <button class="lightbox-next" aria-label="Next photo"><i class="fa-solid fa-chevron-right"></i></button>
+  <div class="lightbox-bar">
+    <button class="lightbox-play" aria-label="Play slideshow"><i class="fa-solid fa-play"></i><i class="fa-solid fa-pause"></i></button>
+    <span class="lightbox-counter">1 / 1</span>
+  </div>
 </div>
 
 <!-- ===================== TESTIMONIALS ===================== -->
