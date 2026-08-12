@@ -167,7 +167,21 @@
   --------------------------------------------------------------------- */
   function initPageTransition() {
     const overlay = document.querySelector(".page-transition");
-    if (!overlay || reduceMotion) return;
+    if (!overlay) return;
+
+    // Safety net for the browser back/forward button: when this page was
+    // left, the overlay was mid-fade (is-active) right before navigating
+    // away. Browsers often restore the *exact* DOM snapshot from that
+    // moment via the back/forward cache (bfcache) instead of reloading —
+    // which would otherwise leave that dark overlay stuck on screen,
+    // fully opaque, blocking the page it "went back to". pageshow fires
+    // on every visit, including bfcache restores (event.persisted), so
+    // this always clears it before the user can see it stuck.
+    window.addEventListener("pageshow", () => {
+      overlay.classList.remove("is-active");
+    });
+
+    if (reduceMotion) return;
 
     document.addEventListener("click", (e) => {
       const link = e.target.closest('a[href*="package-detail.html"]');
