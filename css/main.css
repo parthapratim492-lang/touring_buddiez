@@ -8,6 +8,47 @@ body.no-scroll{ overflow:hidden; height:100vh; }
 
 section{ position:relative; }
 
+/* ---------- Craft details -----------------------------------------------------------
+   The small things that separate a polished site from an assembled one: a
+   scrollbar and text-selection color that match the brand instead of the
+   OS default, visible-but-unobtrusive keyboard focus, smooth in-page
+   navigation, and a whisper of film grain on the hero for texture. */
+
+@media (prefers-reduced-motion: no-preference){
+  html{ scroll-behavior: smooth; }
+}
+
+::selection{ background: var(--brass-500); color: var(--ink); }
+::-moz-selection{ background: var(--brass-500); color: var(--ink); }
+
+::-webkit-scrollbar{ width:10px; height:10px; }
+::-webkit-scrollbar-track{ background: var(--mist-050); }
+::-webkit-scrollbar-thumb{ background: var(--forest-700); border-radius: var(--radius-pill); border:2px solid var(--mist-050); }
+::-webkit-scrollbar-thumb:hover{ background: var(--brass-500); }
+html{ scrollbar-color: var(--forest-700) var(--mist-050); scrollbar-width: thin; }
+
+:focus-visible{ outline: 2px solid var(--brass-500); outline-offset: 3px; border-radius: 3px; }
+.on-dark :focus-visible, .hero :focus-visible{ outline-color: var(--brass-400); }
+
+/* A near-invisible animated grain layer on the hero only — cinematic film
+   texture, not a design element you're meant to consciously notice. */
+.hero-grain{
+  position:absolute; inset:0; z-index:2; pointer-events:none;
+  opacity:.05; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation: grain-shift 8s steps(6) infinite;
+}
+@keyframes grain-shift{
+  0%,100%{ transform: translate(0,0); }
+  20%{ transform: translate(-2%,2%); }
+  40%{ transform: translate(2%,-1%); }
+  60%{ transform: translate(-1%,-2%); }
+  80%{ transform: translate(2%,2%); }
+}
+@media (prefers-reduced-motion: reduce){
+  .hero-grain{ animation: none; }
+}
+
 /* ---------- Preloader --------------------------------------------------------------- */
 .loader{
   position:fixed; inset:0;

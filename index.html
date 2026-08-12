@@ -45,7 +45,7 @@
 }
 </script>
 
-<link rel="icon" href="assets/logo/logo.png">
+<link rel="icon" href="assets/logo/favicon.png">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#173A31">
 <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
@@ -54,6 +54,8 @@
 <meta name="apple-mobile-web-app-title" content="Touring Buddiez">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+<link rel="preconnect" href="https://unpkg.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;0,800;1,500;1,600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -80,7 +82,6 @@
   <div class="container">
     <a href="#home" class="nav-logo">
       <img src="assets/logo/logo.png" alt="Touring Buddiez logo">
-      <span>Touring Buddiez</span>
     </a>
     <div class="nav-links">
       <a href="#home">Home</a>
@@ -111,13 +112,13 @@
 <!-- ===================== HERO ===================== -->
 <section class="hero" id="home">
   <div class="hero-media" id="hero-media">
-    <video class="hero-video is-active" autoplay muted loop playsinline preload="auto" poster="assets/hero/poster.jpg" data-index="0">
+    <video class="hero-video is-active" autoplay muted playsinline preload="auto" poster="assets/hero/poster.jpg" data-index="0">
       <source src="assets/hero/video/hero1.mp4" type="video/mp4">
     </video>
-    <video class="hero-video" muted loop playsinline preload="none" data-index="1">
+    <video class="hero-video" muted playsinline preload="none" data-index="1">
       <source src="assets/hero/video/hero2.mp4" type="video/mp4">
     </video>
-    <video class="hero-video" muted loop playsinline preload="none" data-index="2">
+    <video class="hero-video" muted playsinline preload="none" data-index="2">
       <source src="assets/hero/video/hero3.mp4" type="video/mp4">
     </video>
     <img class="hero-fallback is-active" src="assets/hero/poster.jpg" alt="Misty hills of Northeast India">
@@ -126,6 +127,7 @@
     <img class="hero-fallback" src="assets/destinations/anini.jpg" alt="Remote roads through the Dibang Valley, Arunachal Pradesh">
     <img class="hero-fallback" src="assets/destinations/dong.jpg" alt="Sunrise over Dong Valley, Arunachal Pradesh">
   </div>
+  <div class="hero-grain" aria-hidden="true"></div>
   <div class="hero-particles" aria-hidden="true">
     <span></span><span></span><span></span><span></span>
     <span></span><span></span><span></span><span></span>

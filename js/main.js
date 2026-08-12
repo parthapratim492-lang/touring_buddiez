@@ -349,6 +349,7 @@
       const next = videos[(i + 1) % videos.length];
       if (next.preload === "none") next.preload = "auto";
       const active = videos[i];
+      active.currentTime = 0; // guarantee a clean restart each time this clip comes back around
       const playPromise = active.play();
       if (playPromise) playPromise.catch(() => {}); // autoplay can be blocked; poster still shows
     };

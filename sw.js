@@ -10,7 +10,7 @@
      below, so a deploy invalidates them automatically).
    ============================================================ */
 
-const CACHE_NAME = 'touring-buddiez-v6';
+const CACHE_NAME = 'touring-buddiez-v9';
 
 const PRECACHE_URLS = [
   '/index.html',
@@ -21,6 +21,7 @@ const PRECACHE_URLS = [
   '/js/main.js',
   '/js/site-data.js',
   '/assets/logo/logo.png',
+  '/assets/logo/favicon.png',
   '/assets/icons/icon-192.png',
   '/assets/icons/icon-512.png',
   '/offline.html'
