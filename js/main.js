@@ -698,6 +698,42 @@
   /* ---------------------------------------------------------------------
      INIT
   --------------------------------------------------------------------- */
+  /* ---------------------------------------------------------------------
+     CONVERSION TRACKING — fires GA4 events on the moments that actually
+     matter for the business: WhatsApp taps and form submits. Entirely
+     safe to run before Analytics is activated (see the GA4 scaffold in
+     <head>) — gtag() is a no-op stub whenever the real tracking script
+     isn't loaded, so this never errors, it just quietly does nothing
+     until a real Measurement ID is in place.
+  --------------------------------------------------------------------- */
+  function initConversionTracking() {
+    if (typeof window.gtag !== "function") {
+      window.gtag = function () {}; // safe no-op stand-in
+    }
+
+    document.addEventListener("click", (e) => {
+      const wa = e.target.closest('a[href*="wa.me"]');
+      if (wa) {
+        window.gtag("event", "whatsapp_click", {
+          event_category: "engagement",
+          link_url: wa.href,
+          page_location: window.location.pathname
+        });
+      }
+    });
+
+    ["contact-form", "review-form"].forEach((id) => {
+      const form = document.getElementById(id);
+      if (!form) return;
+      form.addEventListener("submit", () => {
+        window.gtag("event", id === "contact-form" ? "generate_lead" : "submit_review", {
+          event_category: "engagement",
+          page_location: window.location.pathname
+        });
+      });
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", () => {
     document.body.classList.add("no-scroll");
     initLoader();
@@ -715,6 +751,7 @@
     initTestimonials();
     initReviewForm();
     initContactForm();
+    initConversionTracking();
   });
 
   /* ---------------------------------------------------------------------

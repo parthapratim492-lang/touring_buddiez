@@ -358,6 +358,8 @@ h1,h2,h3,h4{ font-family: var(--font-display); line-height: var(--lh-tight); fon
   font-size: var(--fs-2xs);
   flex-wrap:wrap; gap: var(--sp-2);
 }
+.footer-bottom a{ color: inherit; text-decoration:underline; text-underline-offset:2px; }
+.footer-bottom a:hover{ color: var(--brass-400); }
 
 /* ---------- Forms ----------------------------------------------------------------- */
 .field{

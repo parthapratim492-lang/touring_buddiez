@@ -389,6 +389,18 @@
     if (pkg.image_path) setMetaTag('property', 'og:image', `https://touringbuddieznortheast.in/${pkg.image_path}`);
     setCanonical(`https://touringbuddieznortheast.in/package-detail.html?slug=${pkg.slug}`);
 
+    const kwMeta = document.querySelector('meta[name="keywords"]');
+    if (kwMeta) {
+      const routeStops = (Array.isArray(pkg.route_stops) ? pkg.route_stops : [])
+        .map(s => (typeof s === 'string' ? s : s.name)).filter(Boolean);
+      const kwParts = [
+        pkg.name, `${pkg.name} tour package`, `${pkg.name} itinerary`,
+        pkg.route, ...routeStops, 'Northeast India tour packages',
+        'Touring Buddiez', 'Guwahati tour operator'
+      ].filter(Boolean);
+      kwMeta.content = [...new Set(kwParts)].join(', ');
+    }
+
     setMetaTag('name', 'twitter:title', document.title);
     setMetaTag('name', 'twitter:description', pkg.description || `${pkg.name} — ${pkg.route}`);
     if (pkg.image_path) setMetaTag('name', 'twitter:image', `https://touringbuddieznortheast.in/${pkg.image_path}`);

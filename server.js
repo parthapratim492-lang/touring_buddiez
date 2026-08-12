@@ -778,6 +778,14 @@ app.put('/api/settings', requireAuth, async (req, res) => {
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'admin', 'index.html')));
 app.get('/admin/', (req, res) => res.sendFile(path.join(__dirname, 'admin', 'index.html')));
 
+// ─── 404 ──────────────────────────────────────────────────────────────────────
+// Must be last — catches anything not matched by a route or a real static
+// file above. Returns an actual 404 status (not 200) so search engines don't
+// mistakenly index broken URLs as valid pages.
+app.use((req, res) => {
+  res.status(404).sendFile(path.join(__dirname, '404.html'));
+});
+
 // ─── Start ────────────────────────────────────────────────────────────────────
 
 app.listen(PORT, '0.0.0.0', () => {

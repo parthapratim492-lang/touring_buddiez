@@ -30,6 +30,15 @@ html{ scrollbar-color: var(--forest-700) var(--mist-050); scrollbar-width: thin;
 :focus-visible{ outline: 2px solid var(--brass-500); outline-offset: 3px; border-radius: 3px; }
 .on-dark :focus-visible, .hero :focus-visible{ outline-color: var(--brass-400); }
 
+.skip-link{
+  position:fixed; top:-100px; left: var(--sp-4); z-index: 2000;
+  background: var(--brass-500); color: var(--ink);
+  font-family: var(--font-body); font-weight:700; font-size: var(--fs-sm);
+  padding: .8em 1.4em; border-radius: var(--radius-sm);
+  transition: top var(--dur-fast) var(--ease-out);
+}
+.skip-link:focus{ top: var(--sp-4); }
+
 /* A near-invisible animated grain layer on the hero only — cinematic film
    texture, not a design element you're meant to consciously notice. */
 .hero-grain{
@@ -639,6 +648,26 @@ h1 em, h2 em, h3 em{ font-style:italic; color: var(--brass-500); }
 .review-form-msg.is-error{ color: var(--rust-500); }
 
 /* ---------- Contact ------------------------------------------------------------------------------- */
+/* ---------- FAQ ------------------------------------------------------------------------------ */
+.faq{ padding-block: var(--sp-8); background: var(--mist-050); }
+.faq-list{ max-width: 760px; margin-inline:auto; display:flex; flex-direction:column; gap: var(--sp-3); }
+.faq-item{
+  background: var(--paper); border:1px solid var(--line-light); border-radius: var(--radius-md);
+  padding: var(--sp-4) var(--sp-5); transition: box-shadow var(--dur-fast) var(--ease-out);
+}
+.faq-item[open]{ box-shadow: var(--shadow-sm); }
+.faq-item summary{
+  cursor:pointer; list-style:none; display:flex; align-items:center; justify-content:space-between; gap: var(--sp-4);
+  font-family: var(--font-display); font-size: var(--fs-md); color: var(--slate-700); font-weight:600;
+}
+.faq-item summary::-webkit-details-marker{ display:none; }
+.faq-item summary::after{
+  content:"\f078"; font-family:"Font Awesome 6 Free"; font-weight:900; font-size: var(--fs-xs);
+  color: var(--brass-600); flex-shrink:0; transition: transform var(--dur-fast) var(--ease-out);
+}
+.faq-item[open] summary::after{ transform: rotate(180deg); }
+.faq-item p{ margin-top: var(--sp-3); color: var(--slate-500); font-size: var(--fs-sm); line-height:1.7; }
+
 .contact{ padding-block: var(--sp-8); background: var(--forest-800); position:relative; overflow:hidden; }
 .contact .container{ display:grid; grid-template-columns: 1fr 1.1fr; gap: var(--sp-7); align-items:flex-start; }
 .contact-info-item{ display:flex; gap: var(--sp-3); margin-bottom: var(--sp-4); align-items:flex-start; }
