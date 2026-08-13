@@ -7,7 +7,7 @@
 // ─── State ───────────────────────────────────────────────────────────────────
 let currentSection = 'dashboard';
 let allPackages = [], allRentals = [], allGallery = [], allTestimonials = [];
-let allBookings = [], allEnquiries = [];
+let allBookings = [], allEnquiries = [], allPayments = [];
 let editingPackageId = null, editingRentalId = null, editingTestimonialId = null;
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
@@ -76,6 +76,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
+  // Payments form
+  document.getElementById('payments-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const data = Object.fromEntries(new FormData(form));
+    // Checkboxes only appear in FormData when checked — normalize to 'true'/'false' explicitly.
+    data.payments_upi_enabled = form.querySelector('#fld-payments_upi_enabled').checked ? 'true' : 'false';
+    data.payments_card_enabled = form.querySelector('#fld-payments_card_enabled').checked ? 'true' : 'false';
+    const msg = document.getElementById('payments-settings-msg');
+    try {
+      await api('PUT', '/api/settings', data);
+      msg.textContent = '✓ Payment settings saved!';
+      msg.style.display = 'block';
+      setTimeout(() => msg.style.display = 'none', 3000);
+      toast('Payment settings saved!');
+      loadPaymentSettings(); // refresh so the secret field shows the masked placeholder again
+    } catch (ex) {
+      toast('Error: ' + ex.message, true);
+    }
+  });
+
   // Password form
   document.getElementById('password-form').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -123,7 +144,7 @@ function showSection(name) {
   const titles = {
     dashboard: 'Dashboard', packages: 'Tour Packages', bookings: 'Bookings', enquiries: 'Enquiries',
     rentals: 'Rental Vehicles', availability: 'Package Availability', gallery: 'Gallery', testimonials: 'Testimonials',
-    settings: 'Site Settings', account: 'Change Password'
+    payments: 'Payments', settings: 'Site Settings', account: 'Change Password'
   };
   document.getElementById('topbar-title').textContent = titles[name] || name;
 
@@ -136,6 +157,7 @@ function showSection(name) {
   else if (name === 'availability') loadAvailability();
   else if (name === 'gallery') loadGallery();
   else if (name === 'testimonials') loadTestimonials();
+  else if (name === 'payments') { loadPaymentSettings(); loadPaymentTransactions(); }
   else if (name === 'settings') loadSettings();
 }
 
@@ -1395,6 +1417,63 @@ async function loadSettings() {
       if (el) el.value = v;
     });
   } catch (ex) { toast('Failed to load settings', true); }
+}
+
+// ─── PAYMENTS ─────────────────────────────────────────────────────────────────
+async function loadPaymentSettings() {
+  try {
+    // /api/admin/settings (not the public one) — includes payment fields,
+    // with the Razorpay secret masked rather than sent as plaintext.
+    const settings = await api('GET', '/api/admin/settings');
+    const form = document.getElementById('payments-form');
+    ['upi_id', 'upi_payee_name', 'razorpay_key_id', 'razorpay_key_secret'].forEach(k => {
+      const el = form.querySelector(`[name="${k}"]`);
+      if (el && settings[k] !== undefined) el.value = settings[k];
+    });
+    form.querySelector('#fld-payments_upi_enabled').checked = settings.payments_upi_enabled === 'true';
+    form.querySelector('#fld-payments_card_enabled').checked = settings.payments_card_enabled === 'true';
+  } catch (ex) { toast('Failed to load payment settings', true); }
+}
+
+async function loadPaymentTransactions() {
+  try {
+    allPayments = await api('GET', '/api/admin/payments');
+    renderPaymentsTable();
+  } catch (ex) { toast('Failed to load transactions', true); }
+}
+
+function renderPaymentsTable() {
+  const tbody = document.getElementById('payments-tbody');
+  if (!allPayments.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--slate-300)">No payment attempts yet.</td></tr>';
+    return;
+  }
+  const methodLabel = { razorpay: 'Card/Online', upi_manual: 'UPI' };
+  tbody.innerHTML = allPayments.map(p => `
+    <tr>
+      <td><span class="status-pill ${esc(p.status)}">${esc(p.status)}</span></td>
+      <td>${esc(methodLabel[p.method] || p.method)}</td>
+      <td><strong>₹${Number(p.amount).toLocaleString('en-IN')}</strong></td>
+      <td>${esc(p.name || '–')}</td>
+      <td style="font-size:.82rem">${esc(p.phone || '–')}</td>
+      <td style="font-size:.8rem;color:var(--slate-300);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.note || '–')}</td>
+      <td style="white-space:nowrap;font-size:.8rem;color:var(--slate-300)">${fmtDate(p.created_at)}</td>
+      <td>
+        <div class="row-actions">
+          ${p.method === 'upi_manual' && p.status !== 'paid' ? `<button class="btn-edit" onclick="setPaymentStatus(${p.id}, 'paid')" title="Confirm you received this in your UPI app"><i class="fa-solid fa-check"></i> Mark Paid</button>` : ''}
+          ${p.status !== 'failed' ? `<button class="btn-secondary" onclick="setPaymentStatus(${p.id}, 'failed')">Mark Failed</button>` : ''}
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function setPaymentStatus(id, status) {
+  try {
+    await api('PATCH', `/api/admin/payments/${id}/status`, { status });
+    toast('Transaction updated');
+    loadPaymentTransactions();
+  } catch (ex) { toast('Error: ' + ex.message, true); }
 }
 
 // ─── Utility ──────────────────────────────────────────────────────────────────

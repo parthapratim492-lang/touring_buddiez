@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Make a Payment | Touring Buddiez</title>
+<meta name="description" content="Pay Touring Buddiez securely by UPI (GPay, PhonePe, Paytm) or card for your Northeast India tour package or car rental.">
+<meta name="robots" content="noindex, follow">
+<link rel="canonical" href="https://touringbuddieznortheast.in/pay.html">
+<link rel="icon" href="assets/logo/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/main.css">
+<meta name="theme-color" content="#173A31">
+<link rel="manifest" href="manifest.json">
+<style>
+  .pay-page{ padding-block: var(--sp-8); max-width:640px; margin-inline:auto; }
+  .pay-page .section-head{ margin-bottom: var(--sp-6); }
+  .pay-form{
+    background: var(--paper); border:1px solid var(--line-light); border-radius: var(--radius-lg);
+    padding: var(--sp-5); box-shadow: var(--shadow-sm); margin-bottom: var(--sp-6);
+  }
+  .pay-form .field-row{ display:grid; grid-template-columns:1fr 1fr; gap: var(--sp-3); }
+  .pay-form .field label{ font-family: var(--font-body); font-weight:600; font-size: var(--fs-2xs); text-transform:uppercase; letter-spacing:.05em; color: var(--slate-500); display:block; margin-bottom:.4em; }
+  .pay-form .field input{
+    width:100%; padding:.9em 1em; border:1px solid var(--line-light); border-radius: var(--radius-sm);
+    font-family: var(--font-body); font-size: var(--fs-sm); color: var(--slate-700); background: var(--mist-050);
+  }
+  .pay-form .field input:focus{ outline:none; border-color: var(--brass-500); }
+  .pay-methods{ display:flex; flex-direction:column; gap: var(--sp-4); }
+  .pay-method-card{
+    background: var(--paper); border:1px solid var(--line-light); border-radius: var(--radius-lg);
+    padding: var(--sp-5); text-align:center;
+  }
+  .pay-method-card h3{ font-size: var(--fs-md); margin-bottom: var(--sp-2); display:flex; align-items:center; justify-content:center; gap:.5em; }
+  .pay-method-card p{ color: var(--slate-500); font-size: var(--fs-sm); margin-bottom: var(--sp-4); }
+  #upi-qr-canvas{ margin:0 auto var(--sp-4); display:block; border-radius: var(--radius-sm); }
+  .pay-app-buttons{ display:flex; gap: var(--sp-2); justify-content:center; flex-wrap:wrap; margin-bottom: var(--sp-3); }
+  .pay-upi-id{ font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--slate-500); margin-bottom: var(--sp-4); }
+  .pay-disabled-note{
+    text-align:center; padding: var(--sp-6); color: var(--slate-500);
+    background: var(--mist-100); border-radius: var(--radius-lg);
+  }
+  .pay-status-msg{ text-align:center; padding: var(--sp-3); border-radius: var(--radius-sm); font-size: var(--fs-sm); margin-top: var(--sp-3); display:none; }
+  .pay-status-msg.ok{ background: rgba(52,168,83,0.12); color:#2f9e57; display:block; }
+  .pay-status-msg.err{ background: rgba(228,87,61,0.1); color:#e4573d; display:block; }
+</style>
+</head>
+<body>
+<a href="#main-content" class="skip-link">Skip to main content</a>
+
+<div class="loader">
+  <svg class="loader-mark" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <path d="M10 70 L30 40 L42 55 L58 25 L75 55 L90 70" />
+  </svg>
+  <div class="loader-bar"><span></span></div>
+  <div class="loader-text">Touring Buddiez</div>
+</div>
+
+<div class="page-transition" aria-hidden="true"></div>
+
+<nav class="nav">
+  <div class="container">
+    <a href="index.html" class="nav-logo"><img src="assets/logo/logo.png" alt="Touring Buddiez logo"></a>
+    <div class="nav-links"><a href="index.html">Home</a><a href="packages.html">Packages</a></div>
+  </div>
+</nav>
+
+<main class="pay-page container" id="main-content">
+  <div class="section-head">
+    <div class="eyebrow">Secure Payment</div>
+    <h1>Make a Payment</h1>
+    <p>Enter the amount you've agreed with us, then pay by UPI or card below.</p>
+  </div>
+
+  <div class="pay-form">
+    <div class="field-row">
+      <div class="field">
+        <label for="pay-name">Your Name</label>
+        <input id="pay-name" type="text" placeholder="Full name" required>
+      </div>
+      <div class="field">
+        <label for="pay-phone">Phone</label>
+        <input id="pay-phone" type="tel" placeholder="+91" required>
+      </div>
+    </div>
+    <div class="field-row" style="margin-top:1rem;">
+      <div class="field">
+        <label for="pay-amount">Amount (&#8377;)</label>
+        <input id="pay-amount" type="number" min="1" step="1" placeholder="e.g. 5000" required>
+      </div>
+      <div class="field">
+        <label for="pay-note">For (optional)</label>
+        <input id="pay-note" type="text" placeholder="e.g. Meghalaya trip advance">
+      </div>
+    </div>
+  </div>
+
+  <div id="pay-methods" class="pay-methods"></div>
+  <div id="pay-status" class="pay-status-msg"></div>
+</main>
+
+<footer class="footer" style="padding-block: var(--sp-6);">
+  <div class="container footer-bottom" style="padding-top:0;">
+    <span>&copy; 2026 Touring Buddiez. All rights reserved.</span>
+    <span><a href="privacy-policy.html">Privacy Policy</a> &middot; <a href="terms-and-conditions.html">Terms &amp; Conditions</a></span>
+    <span>Guwahati, Assam, India</span>
+  </div>
+</footer>
+
+<script src="https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="js/main.js"></script>
+<script src="js/pay.js"></script>
+</body>
+</html>

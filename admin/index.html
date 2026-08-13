@@ -78,6 +78,9 @@
         <i class="fa-solid fa-quote-left"></i><span>Testimonials</span>
         <span id="testimonials-pending-badge" class="nav-badge" style="display:none"></span>
       </a>
+      <a href="#" class="nav-item" data-section="payments">
+        <i class="fa-solid fa-money-bill-wave"></i><span>Payments</span>
+      </a>
       <a href="#" class="nav-item" data-section="settings">
         <i class="fa-solid fa-gear"></i><span>Site Settings</span>
       </a>
@@ -376,6 +379,82 @@
               </tr>
             </thead>
             <tbody id="testimonials-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ── PAYMENTS ── -->
+      <section id="section-payments" class="section">
+        <div class="section-head">
+          <h2>Payments</h2>
+          <p>Configure how customers can pay you directly, and see a log of payment attempts.</p>
+        </div>
+        <form id="payments-form" class="settings-form">
+          <div class="settings-group">
+            <h3><i class="fa-solid fa-qrcode"></i> UPI (GPay, PhonePe, Paytm, BHIM)</h3>
+            <p class="field-hint">UPI is interoperable — one UPI ID works from any UPI app. Customers scan a QR code or tap a "Pay with GPay/PhonePe" button on the site; the payment happens directly in their bank app, with no gateway fees.</p>
+            <div class="field-row">
+              <div class="field">
+                <label for="fld-upi_id">Your UPI ID</label>
+                <input id="fld-upi_id" type="text" name="upi_id" placeholder="yourname@okicici / @okhdfcbank / @paytm">
+              </div>
+              <div class="field">
+                <label for="fld-upi_payee_name">Display Name on Payment Request</label>
+                <input id="fld-upi_payee_name" type="text" name="upi_payee_name" placeholder="Touring Buddiez">
+              </div>
+            </div>
+            <div class="field checkbox-field">
+              <label><input type="checkbox" id="fld-payments_upi_enabled" name="payments_upi_enabled"> Show UPI payment option on the website</label>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <h3><i class="fa-solid fa-credit-card"></i> Card &amp; Netbanking (Razorpay)</h3>
+            <p class="field-hint">
+              For cards, netbanking, and wallets, you'll need a free Razorpay account — sign up at
+              <a href="https://razorpay.com" target="_blank" rel="noopener">razorpay.com</a>, complete their KYC,
+              then paste your API keys below (Settings → API Keys in your Razorpay dashboard).
+            </p>
+            <div class="field-row">
+              <div class="field">
+                <label for="fld-razorpay_key_id">Razorpay Key ID</label>
+                <input id="fld-razorpay_key_id" type="text" name="razorpay_key_id" placeholder="rzp_live_xxxxxxxxxxxx" autocomplete="off">
+              </div>
+              <div class="field">
+                <label for="fld-razorpay_key_secret">Razorpay Key Secret</label>
+                <input id="fld-razorpay_key_secret" type="password" name="razorpay_key_secret" placeholder="Leave blank to keep current secret" autocomplete="off">
+              </div>
+            </div>
+            <div class="field checkbox-field">
+              <label><input type="checkbox" id="fld-payments_card_enabled" name="payments_card_enabled"> Show card/netbanking payment option on the website</label>
+            </div>
+          </div>
+
+          <button type="submit" class="btn-primary"><i class="fa-solid fa-floppy-disk"></i> Save Payment Settings</button>
+          <p id="payments-settings-msg" class="success-msg" style="display:none"></p>
+        </form>
+
+        <div class="section-head" style="margin-top:2.5rem;">
+          <div>
+            <h2>Transaction Log</h2>
+            <p>UPI payments are logged when a customer says they've paid — verify against your actual bank/UPI app before marking them paid. Razorpay payments are verified automatically.</p>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Status</th>
+                <th>Method</th>
+                <th>Amount</th>
+                <th>Name</th>
+                <th>Phone</th>
+                <th>Note</th>
+                <th>Date</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="payments-tbody"></tbody>
           </table>
         </div>
       </section>

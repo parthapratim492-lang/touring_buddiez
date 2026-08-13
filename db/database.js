@@ -152,6 +152,19 @@ const EnquirySchema = new mongoose.Schema({
   created_at: { type: String, default: () => new Date().toISOString() }
 });
 
+const PaymentTransactionSchema = new mongoose.Schema({
+  id: { type: Number, unique: true },
+  method: { type: String, required: true }, // 'razorpay' | 'upi_manual'
+  razorpay_order_id: String,
+  razorpay_payment_id: String,
+  amount: { type: Number, required: true }, // in INR (rupees, not paise)
+  name: String,
+  phone: String,
+  note: String,
+  status: { type: String, default: 'created' }, // created | paid | failed
+  created_at: { type: String, default: () => new Date().toISOString() }
+});
+
 const AdminUser = mongoose.model('AdminUser', AdminUserSchema);
 const Package = mongoose.model('Package', PackageSchema);
 const Rental = mongoose.model('Rental', RentalSchema);
@@ -161,6 +174,7 @@ const Setting = mongoose.model('Setting', SettingSchema);
 const Booking = mongoose.model('Booking', BookingSchema);
 const AvailabilityBlock = mongoose.model('AvailabilityBlock', AvailabilityBlockSchema);
 const Enquiry = mongoose.model('Enquiry', EnquirySchema);
+const PaymentTransaction = mongoose.model('PaymentTransaction', PaymentTransactionSchema);
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -433,7 +447,13 @@ async function seed() {
       ['stat_years', '2025'],
       ['stat_rating', '4.9'],
       ['site_description', 'Curated tours and reliable car rentals across Northeast India, based in Guwahati, Assam.'],
-      ['response_time', 'usually within the hour']
+      ['response_time', 'usually within the hour'],
+      ['upi_id', ''],
+      ['upi_payee_name', 'Touring Buddiez'],
+      ['payments_upi_enabled', 'false'],
+      ['payments_card_enabled', 'false'],
+      ['razorpay_key_id', ''],
+      ['razorpay_key_secret', '']
     ];
     for (const [key, value] of settings) {
       await Setting.create({ key, value });
@@ -589,6 +609,19 @@ module.exports = {
   },
 
   deleteAvailabilityBlock: (id) => AvailabilityBlock.deleteOne({ id }),
+
+  // ─── Payment transactions ─────────────────────────────────────────────────
+  createPaymentTransaction: async (data) => {
+    const id = await nextId('payment_transactions');
+    const doc = await PaymentTransaction.create({ ...data, id, created_at: new Date().toISOString() });
+    return plain(doc);
+  },
+  getPaymentTransactionByOrderId: (orderId) => PaymentTransaction.findOne({ razorpay_order_id: orderId }).then(plain),
+  setPaymentTransactionStatus: (id, status, extra = {}) => PaymentTransaction.updateOne({ id }, { status, ...extra }),
+  getAllPaymentTransactions: async () => {
+    const docs = await PaymentTransaction.find().then(plainAll);
+    return docs.sort((a, b) => b.id - a.id);
+  },
 
   // Stats (for the admin analytics dashboard)
   getStats: async () => {

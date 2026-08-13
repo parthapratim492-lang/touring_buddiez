@@ -144,6 +144,9 @@ input[type="checkbox"] { width: auto; cursor: pointer; accent-color: var(--fores
 .status-pill.completed,
 .status-pill.closed { background: rgba(100,116,139,0.15); color: #64748b; }
 .status-pill.new { background: rgba(42,157,143,0.15); color: #2A9D8F; }
+.status-pill.paid { background: rgba(52,168,83,0.15); color: #2f9e57; }
+.status-pill.failed { background: rgba(228,87,61,0.12); color: #e4573d; }
+.status-pill.created { background: rgba(217,190,140,0.18); color: var(--brass-600); }
 
 .sidebar-footer {
   padding: 1rem 0.75rem; border-top: 1px solid rgba(255,255,255,0.08);
@@ -378,6 +381,10 @@ tbody td { padding: 0.85rem 1.1rem; font-size: 0.88rem; vertical-align: middle; 
 }
 .settings-group:hover { box-shadow: var(--shadow-md); border-color: rgba(200,169,107,0.25); }
 .settings-group h3 { display: flex; align-items: center; gap: 0.5rem; font-size: 0.95rem; color: var(--forest-800); font-weight: 700; margin-bottom: 1.1rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--mist-100); }
+.field-hint { font-size: 0.82rem; color: var(--slate-500); line-height: 1.6; margin-bottom: 1rem; }
+.field-hint a { color: var(--brass-600); text-decoration: underline; }
+.checkbox-field label { display: flex; align-items: center; gap: 0.6rem; text-transform: none; font-size: 0.88rem; color: var(--slate-700); cursor: pointer; letter-spacing: normal; }
+.checkbox-field input[type="checkbox"] { width: 18px; height: 18px; }
 
 .field { margin-bottom: 1rem; }
 .field label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--slate-500); margin-bottom: 0.35rem; text-transform: uppercase; letter-spacing: 0.04em; }

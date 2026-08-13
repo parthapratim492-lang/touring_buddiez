@@ -9,6 +9,8 @@ const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
+const Razorpay = require('razorpay');
 const db = require('./db/database');
 const { sendBookingConfirmedEmail } = require('./lib/mailer');
 
@@ -751,9 +753,30 @@ app.get('/api/stats', requireAuth, async (req, res) => {
 
 // ─── Settings ─────────────────────────────────────────────────────────────────
 
+// Never expose this to the public endpoint below — it's the Razorpay secret
+// key, capable of creating charges and reading payment data on your account.
+const SENSITIVE_SETTING_KEYS = ['razorpay_key_secret'];
+const SECRET_MASK = '••••••••';
+
 app.get('/api/settings', async (req, res) => {
   try {
-    res.json(await db.getAllSettings());
+    const settings = await db.getAllSettings();
+    SENSITIVE_SETTING_KEYS.forEach(k => delete settings[k]);
+    res.json(settings);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin-only: same as above, but includes payment-config fields the public
+// endpoint deliberately hides. The secret itself is still never sent back
+// as plaintext — only a masked placeholder if one is already configured —
+// so it can't leak via a browser dev-tools inspection or a proxy log.
+app.get('/api/admin/settings', requireAuth, async (req, res) => {
+  try {
+    const settings = await db.getAllSettings();
+    if (settings.razorpay_key_secret) settings.razorpay_key_secret = SECRET_MASK;
+    res.json(settings);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -763,10 +786,162 @@ app.put('/api/settings', requireAuth, async (req, res) => {
   try {
     const allowed = ['phone', 'phone_raw', 'whatsapp', 'email', 'instagram', 'facebook',
                      'base_location', 'stat_destinations',
-                     'stat_years', 'stat_rating', 'site_description', 'response_time'];
+                     'stat_years', 'stat_rating', 'site_description', 'response_time',
+                     'upi_id', 'upi_payee_name', 'payments_upi_enabled',
+                     'payments_card_enabled', 'razorpay_key_id'];
     for (const key of allowed) {
       if (req.body[key] !== undefined) await db.setSetting(key, req.body[key]);
     }
+    // razorpay_key_secret handled separately: skip entirely if the field was
+    // left blank or still holds the masked placeholder (means "unchanged"),
+    // so saving the rest of the form never accidentally wipes out or
+    // corrupts an already-configured secret.
+    const incomingSecret = req.body.razorpay_key_secret;
+    if (incomingSecret !== undefined && incomingSecret !== '' && incomingSecret !== SECRET_MASK) {
+      await db.setSetting('razorpay_key_secret', incomingSecret);
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Payments ─────────────────────────────────────────────────────────────────
+// UPI payments (GPay/PhonePe/Paytm/BHIM — any UPI app, since UPI itself is
+// interoperable) need no gateway at all: the public pay page builds a
+// standard upi://pay deep link straight from the UPI ID configured in
+// Settings. Card/netbanking payments go through Razorpay, which needs a
+// real merchant account — these two endpoints implement that flow.
+
+const paymentAttempts = new Map(); // ip -> { count, firstAttempt } — light abuse guard
+function paymentRateLimit(req, res, next) {
+  const ip = req.ip || req.connection.remoteAddress || 'unknown';
+  const now = Date.now();
+  const entry = paymentAttempts.get(ip);
+  const WINDOW_MS = 10 * 60 * 1000;
+  if (!entry || now - entry.firstAttempt > WINDOW_MS) {
+    paymentAttempts.set(ip, { count: 1, firstAttempt: now });
+    return next();
+  }
+  if (entry.count >= 15) {
+    return res.status(429).json({ error: 'Too many payment attempts. Please try again later.' });
+  }
+  entry.count += 1;
+  next();
+}
+
+app.post('/api/payments/create-order', paymentRateLimit, async (req, res) => {
+  try {
+    const { amount, name, phone, note } = req.body;
+    const rupees = Number(amount);
+    if (!rupees || rupees <= 0 || rupees > 1000000) {
+      return res.status(400).json({ error: 'Please enter a valid amount.' });
+    }
+
+    const keyId = await db.getSetting('razorpay_key_id');
+    const keySecret = await db.getSetting('razorpay_key_secret');
+    const cardEnabled = await db.getSetting('payments_card_enabled');
+    if (cardEnabled !== 'true' || !keyId || !keySecret) {
+      return res.status(400).json({ error: 'Card payments are not enabled yet. Please use UPI or contact us directly.' });
+    }
+
+    const instance = new Razorpay({ key_id: keyId, key_secret: keySecret });
+    const order = await instance.orders.create({
+      amount: Math.round(rupees * 100), // Razorpay expects paise
+      currency: 'INR',
+      receipt: `tb_${Date.now()}`
+    });
+
+    await db.createPaymentTransaction({
+      method: 'razorpay',
+      razorpay_order_id: order.id,
+      amount: rupees,
+      name: (name || '').slice(0, 100),
+      phone: (phone || '').slice(0, 30),
+      note: (note || '').slice(0, 300),
+      status: 'created'
+    });
+
+    res.json({ order_id: order.id, key_id: keyId, amount: order.amount, currency: order.currency });
+  } catch (err) {
+    console.error('Razorpay order creation failed:', err.message);
+    res.status(500).json({ error: 'Could not start payment. Please try again or use UPI.' });
+  }
+});
+
+app.post('/api/payments/verify', paymentRateLimit, async (req, res) => {
+  try {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+      return res.status(400).json({ error: 'Missing payment details.' });
+    }
+
+    const keySecret = await db.getSetting('razorpay_key_secret');
+    if (!keySecret) return res.status(400).json({ error: 'Payments are not configured.' });
+
+    const expected = crypto
+      .createHmac('sha256', keySecret)
+      .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+      .digest('hex');
+
+    const isValid = expected === razorpay_signature;
+    const txn = await db.getPaymentTransactionByOrderId(razorpay_order_id);
+
+    if (!isValid) {
+      if (txn) await db.setPaymentTransactionStatus(txn.id, 'failed');
+      return res.status(400).json({ error: 'Payment verification failed.' });
+    }
+
+    if (txn) {
+      await db.setPaymentTransactionStatus(txn.id, 'paid', { razorpay_payment_id });
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Payment verification error:', err.message);
+    res.status(500).json({ error: 'Could not verify payment.' });
+  }
+});
+
+// A visitor paying by UPI happens entirely outside this server (their UPI
+// app talks directly to their bank) — there's no callback to verify. This
+// just logs that someone said they paid this way, so it shows up in the
+// admin panel for manual reconciliation against the actual bank/UPI app.
+app.post('/api/payments/log-upi', paymentRateLimit, async (req, res) => {
+  try {
+    const { amount, name, phone, note } = req.body;
+    const rupees = Number(amount);
+    if (!rupees || rupees <= 0 || rupees > 1000000) {
+      return res.status(400).json({ error: 'Please enter a valid amount.' });
+    }
+    await db.createPaymentTransaction({
+      method: 'upi_manual',
+      amount: rupees,
+      name: (name || '').slice(0, 100),
+      phone: (phone || '').slice(0, 30),
+      note: (note || '').slice(0, 300),
+      status: 'created' // admin marks it paid after checking their UPI app
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/admin/payments', requireAuth, async (req, res) => {
+  try {
+    res.json(await db.getAllPaymentTransactions());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.patch('/api/admin/payments/:id/status', requireAuth, async (req, res) => {
+  try {
+    const { status } = req.body;
+    if (!['created', 'paid', 'failed'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+    await db.setPaymentTransactionStatus(parseInt(req.params.id), status);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
