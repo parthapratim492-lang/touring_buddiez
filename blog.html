@@ -3,11 +3,38 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title id="pkg-page-title">Package | Touring Buddiez</title>
-<meta id="pkg-meta-description" name="description" content="Tour package details — Touring Buddiez.">
-<meta id="pkg-meta-keywords" name="keywords" content="Northeast India tour packages, Touring Buddiez">
+<meta name="description" content="Practical guides for planning a Northeast India trip — ILP permits, best time to visit, road trip planning, and more from Touring Buddiez.">
+<meta name="keywords" content="Northeast India travel guide, ILP permit guide, best time to visit Meghalaya, Northeast India road trip planning, Touring Buddiez blog">
+<meta name="author" content="Touring Buddiez">
 <meta name="robots" content="index, follow">
-<link id="pkg-canonical" rel="canonical" href="https://touringbuddieznortheast.in/package-detail.html">
+<link rel="canonical" href="https://touringbuddieznortheast.in/blog.html">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Touring Buddiez">
+<meta property="og:title" content="Travel Guides | Touring Buddiez">
+<meta property="og:description" content="Practical guides for planning a Northeast India trip — permits, best time to visit, and road trip planning.">
+<meta property="og:url" content="https://touringbuddieznortheast.in/blog.html">
+<meta property="og:image" content="https://touringbuddieznortheast.in/assets/hero/poster.jpg">
+<meta property="og:locale" content="en_IN">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Travel Guides | Touring Buddiez">
+<meta name="twitter:description" content="Practical guides for planning a Northeast India trip.">
+<meta name="twitter:image" content="https://touringbuddieznortheast.in/assets/hero/poster.jpg">
+
+<title>Travel Guides | Touring Buddiez</title>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://touringbuddieznortheast.in/" },
+    { "@type": "ListItem", "position": 2, "name": "Blog", "item": "https://touringbuddieznortheast.in/blog.html" }
+  ]
+}
+</script>
+
 <link rel="icon" href="assets/logo/favicon.png">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#173A31">
@@ -15,26 +42,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Touring Buddiez">
-
-<meta property="og:type" content="website">
-<meta property="og:site_name" content="Touring Buddiez">
-<meta id="pkg-og-title" property="og:title" content="Package | Touring Buddiez">
-<meta id="pkg-og-description" property="og:description" content="Tour package details — Touring Buddiez.">
-<meta id="pkg-og-image" property="og:image" content="https://touringbuddieznortheast.in/assets/hero/poster.jpg">
-<meta id="pkg-og-url" property="og:url" content="https://touringbuddieznortheast.in/package-detail.html">
-
-<meta name="twitter:card" content="summary_large_image">
-<meta id="pkg-twitter-title" name="twitter:title" content="Package | Touring Buddiez">
-<meta id="pkg-twitter-description" name="twitter:description" content="Tour package details — Touring Buddiez.">
-<meta id="pkg-twitter-image" name="twitter:image" content="https://touringbuddieznortheast.in/assets/hero/poster.jpg">
-
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
-<link rel="preconnect" href="https://unpkg.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;0,800;1,500;1,600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 
 <link rel="stylesheet" href="css/tokens.css">
 <link rel="stylesheet" href="css/components.css">
@@ -57,7 +69,6 @@
 <body>
 <a href="#main-content" class="skip-link">Skip to main content</a>
 
-<!-- ===================== PRELOADER ===================== -->
 <div class="loader">
   <svg class="loader-mark" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
     <path d="M10 70 L30 40 L42 55 L58 25 L75 55 L90 70" />
@@ -68,7 +79,6 @@
 
 <div class="page-transition" aria-hidden="true"></div>
 
-<!-- ===================== NAV ===================== -->
 <nav class="nav is-scrolled">
   <div class="container">
     <a href="index.html" class="nav-logo">
@@ -77,9 +87,9 @@
     <div class="nav-links">
       <a href="index.html#home">Home</a>
       <a href="index.html#about">About</a>
-      <a href="packages.html" class="active">Packages</a>
+      <a href="packages.html">Packages</a>
       <a href="index.html#rentals">Rentals</a>
-      <a href="blog.html">Blog</a>
+      <a href="blog.html" class="active">Blog</a>
       <a href="index.html#contact">Contact</a>
     </div>
     <div class="nav-actions">
@@ -100,50 +110,32 @@
   <a href="https://wa.me/919707386186" target="_blank" class="btn btn-primary" style="margin-top:1rem;"><i class="fa-brands fa-whatsapp"></i> Plan My Trip</a>
 </div>
 
-<!-- ===================== SUBPAGE HERO (populated by site-data.js) ===================== -->
 <section class="subpage-hero" id="main-content">
-  <img id="pkg-hero-img" src="assets/hero/poster.jpg" alt="Package">
+  <img src="assets/hero/poster.jpg" alt="Misty hills of Northeast India">
   <div class="container subpage-hero-content">
-    <div class="subpage-breadcrumb">
-      <a href="index.html">Home</a><span>/</span>
-      <a href="packages.html">Packages</a><span>/</span>
-      <span id="pkg-breadcrumb-name">Loading&hellip;</span>
-    </div>
-    <h1 id="pkg-hero-title">Loading&hellip;</h1>
-    <p id="pkg-hero-sub"></p>
+    <div class="subpage-breadcrumb"><a href="index.html">Home</a><span>/</span><span>Blog</span></div>
+    <h1 data-reveal>Travel Guides<br>&amp; Trip Planning.</h1>
+    <p data-reveal data-reveal-delay="1">Practical, honest guides for planning a Northeast India trip — permits, timing, and what we've learned running these routes ourselves.</p>
   </div>
 </section>
 
-<!-- ===================== PACKAGE DETAIL (populated by site-data.js) ===================== -->
-<section class="pkg-detail">
+<section class="blog-listing">
   <div class="container">
-    <div id="pkg-detail-content">
+    <div id="blog-listing-grid" class="blog-grid">
       <div class="state-empty">
         <i class="fa-solid fa-circle-notch fa-spin" style="font-size:2rem;margin-bottom:1rem;display:block;color:var(--brass-500)"></i>
-        <p>Loading package details&hellip;</p>
+        <p>Loading guides&hellip;</p>
       </div>
     </div>
   </div>
 </section>
 
-<div class="lightbox">
-  <button class="lightbox-close" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
-  <button class="lightbox-prev" aria-label="Previous photo"><i class="fa-solid fa-chevron-left"></i></button>
-  <img src="" alt="">
-  <button class="lightbox-next" aria-label="Next photo"><i class="fa-solid fa-chevron-right"></i></button>
-  <div class="lightbox-bar">
-    <button class="lightbox-play" aria-label="Play slideshow"><i class="fa-solid fa-play"></i><i class="fa-solid fa-pause"></i></button>
-    <span class="lightbox-counter">1 / 1</span>
-  </div>
-</div>
-
-<!-- ===================== FOOTER ===================== -->
 <footer class="footer">
   <div class="container">
     <div class="footer-grid">
       <div class="footer-brand">
         <img src="assets/logo/logo.png" alt="Touring Buddiez logo">
-        <p>Curated tours and reliable car rentals across Northeast India, based in Guwahati, Assam.</p>
+        <p>Curated journeys across Northeast India, based in Guwahati, Assam.</p>
         <div class="footer-social">
           <a href="https://instagram.com/touring_buddiez" target="_blank" aria-label="Instagram"><i class="fa-brands fa-instagram"></i></a>
           <a href="https://wa.me/919707386186" target="_blank" aria-label="WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>
@@ -158,6 +150,7 @@
           <li><a href="index.html#about">About</a></li>
           <li><a href="packages.html">Packages</a></li>
           <li><a href="index.html#rentals">Rentals</a></li>
+          <li><a href="blog.html">Blog</a></li>
           <li><a href="index.html#contact">Contact</a></li>
           <li><a href="pay.html">Make a Payment</a></li>
         </ul>
@@ -170,17 +163,14 @@
           <li><a href="package-detail.html?slug=bhutan">Bhutan</a></li>
           <li><a href="package-detail.html?slug=anini">Anini</a></li>
           <li><a href="package-detail.html?slug=dong">Dong Valley</a></li>
-          <li><a href="package-detail.html?slug=ziro-fest">Ziro Fest</a></li>
-          <li><a href="package-detail.html?slug=kaho">Kaho</a></li>
         </ul>
       </div>
       <div>
         <h4>Contact</h4>
         <ul>
-          <li><i class="fa-solid fa-location-dot"></i>&nbsp; Guwahati, Assam</li>
-          <li><a href="tel:+919707386186"><i class="fa-solid fa-phone"></i>&nbsp; +91 97073 86186</a></li>
-          <li><a href="mailto:tourbuddiez@gmail.com"><i class="fa-solid fa-envelope"></i>&nbsp; tourbuddiez@gmail.com</a></li>
-          <li><a href="https://instagram.com/touring_buddiez" target="_blank"><i class="fa-brands fa-instagram"></i>&nbsp; @touring_buddiez</a></li>
+          <li><i class="fa-solid fa-phone"></i> <a href="tel:+919707386186">+91 97073 86186</a></li>
+          <li><i class="fa-solid fa-envelope"></i> <a href="mailto:tourbuddiez@gmail.com">tourbuddiez@gmail.com</a></li>
+          <li><i class="fa-solid fa-location-dot"></i> Guwahati, Assam, India</li>
         </ul>
       </div>
     </div>
@@ -192,11 +182,7 @@
   </div>
 </footer>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="js/main.js"></script>
-<script src="js/route-map.js"></script>
-<script src="js/booking-form.js"></script>
-<script src="js/site-data.js"></script>
-<a href="https://wa.me/919707386186?text=Hi%20Touring%20Buddiez%2C%20I%27d%20like%20to%20book%20a%20trip" target="_blank" rel="noopener" class="float-book" aria-label="Book instantly on WhatsApp"><span class="float-book-icon"><i class="fa-brands fa-whatsapp"></i></span><span class="float-book-text"><small>Instant Booking</small>Chat &amp; Book Now</span></a>
+<script src="js/blog.js"></script>
 </body>
 </html>

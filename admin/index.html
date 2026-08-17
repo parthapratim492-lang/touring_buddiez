@@ -78,6 +78,9 @@
         <i class="fa-solid fa-quote-left"></i><span>Testimonials</span>
         <span id="testimonials-pending-badge" class="nav-badge" style="display:none"></span>
       </a>
+      <a href="#" class="nav-item" data-section="blog">
+        <i class="fa-solid fa-newspaper"></i><span>Blog</span>
+      </a>
       <a href="#" class="nav-item" data-section="payments">
         <i class="fa-solid fa-money-bill-wave"></i><span>Payments</span>
       </a>
@@ -379,6 +382,31 @@
               </tr>
             </thead>
             <tbody id="testimonials-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ── BLOG ── -->
+      <section id="section-blog" class="section">
+        <div class="section-head">
+          <div>
+            <h2>Blog</h2>
+            <p>Guides and articles shown on the public blog — real content that helps with search rankings, not just packages.</p>
+          </div>
+          <button class="btn-primary" onclick="openBlogForm()"><i class="fa-solid fa-plus"></i> New Post</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Status</th>
+                <th>Title</th>
+                <th>Tags</th>
+                <th>Published</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="blog-tbody"></tbody>
           </table>
         </div>
       </section>

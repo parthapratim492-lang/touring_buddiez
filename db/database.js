@@ -70,6 +70,7 @@ const PackageSchema = new mongoose.Schema({
   vehicle: String,
   price: String,
   image_path: String,
+  gallery_images: { type: Array, default: [] },
   description: String,
   itinerary: { type: Array, default: [] },
   inclusions: { type: Array, default: [] },
@@ -165,6 +166,21 @@ const PaymentTransactionSchema = new mongoose.Schema({
   created_at: { type: String, default: () => new Date().toISOString() }
 });
 
+const BlogPostSchema = new mongoose.Schema({
+  id: { type: Number, unique: true },
+  slug: { type: String, unique: true, required: true },
+  title: { type: String, required: true },
+  excerpt: String,
+  content: { type: String, default: '' }, // simple markdown-lite — see parseMarkdownLite()
+  cover_image: String,
+  tags: { type: Array, default: [] },
+  meta_description: String,
+  status: { type: String, default: 'draft' }, // draft | published
+  published_at: String,
+  created_at: { type: String, default: () => new Date().toISOString() },
+  updated_at: { type: String, default: () => new Date().toISOString() }
+});
+
 const AdminUser = mongoose.model('AdminUser', AdminUserSchema);
 const Package = mongoose.model('Package', PackageSchema);
 const Rental = mongoose.model('Rental', RentalSchema);
@@ -175,6 +191,7 @@ const Booking = mongoose.model('Booking', BookingSchema);
 const AvailabilityBlock = mongoose.model('AvailabilityBlock', AvailabilityBlockSchema);
 const Enquiry = mongoose.model('Enquiry', EnquirySchema);
 const PaymentTransaction = mongoose.model('PaymentTransaction', PaymentTransactionSchema);
+const BlogPost = mongoose.model('BlogPost', BlogPostSchema);
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -433,6 +450,120 @@ async function seed() {
   // original SQLite version's note. They only enter via a real visitor
   // submission or a manual admin entry.
 
+  const blogCount = await BlogPost.countDocuments();
+  if (blogCount === 0) {
+    const now = new Date().toISOString();
+    const posts = [
+      {
+        slug: 'ilp-permit-guide-northeast-india',
+        title: 'ILP Permit Guide: Arunachal Pradesh, Nagaland & Mizoram',
+        excerpt: "Everything you need to know about the Inner Line Permit and Protected Area Permit before you travel to Northeast India's restricted zones.",
+        meta_description: 'A complete guide to the Inner Line Permit (ILP) for Arunachal Pradesh, Nagaland, and Mizoram, plus Protected Area Permits for foreign nationals — what you need, how to get it, and how long it takes.',
+        tags: ['Permits', 'Planning', 'Arunachal Pradesh'],
+        cover_image: 'assets/destinations/dong.jpg',
+        status: 'published',
+        published_at: now,
+        content: `## What is the Inner Line Permit?
+
+The Inner Line Permit (ILP) is a travel document Indian citizens need to enter Arunachal Pradesh, Nagaland, and Mizoram. It exists to regulate movement into border-sensitive and protected tribal areas — it isn't a visa, but it's just as mandatory. Foreign nationals need a different document instead: a Protected Area Permit (PAP), which has its own set of rules.
+
+## Who actually needs one
+
+- **Indian citizens** travelling to Arunachal Pradesh, Nagaland, or Mizoram need an ILP.
+- **Foreign nationals** need a Protected Area Permit (PAP) for all three states, and for parts of Sikkim near the China border.
+- Residents of the state you're visiting, and a few other exempted categories, don't need a permit — but always confirm current rules before you travel, since these change.
+
+## How long it takes
+
+For most routes we run, ILP processing takes anywhere from a same-day turnaround up to a few working days, depending on the entry point and the specific district. Remote-route trips — Anini, Kaho, Dong Valley — sit at the longer end of that range because they involve additional district-level clearances beyond the basic ILP.
+
+## What we handle for you
+
+On every package that requires a permit, we take care of the paperwork as part of planning your trip — you'll need to send us clear photos of your ID and a passport-size photo, and we handle the rest. That said, permit issuance is ultimately at the discretion of the relevant government authority, so we'd always recommend booking with enough lead time, especially for remote routes.
+
+## Practical tips
+
+- Carry physical copies of your ID and the permit itself — don't rely on a phone screenshot at checkpoints.
+- Build in a buffer day if you're travelling during a festival period (Ziro Fest, Losar, Hornbill Festival) — processing can slow down when permit offices are busier than usual.
+- If you're combining multiple restricted states in one trip (say, Arunachal Pradesh into Nagaland), you'll need a separate permit for each.
+
+If you're planning a trip into any of these regions, [get in touch](/index.html#contact) and we'll walk you through exactly what's needed for your specific route.`
+      },
+      {
+        slug: 'best-time-to-visit-meghalaya',
+        title: 'Best Time to Visit Meghalaya: A Season-by-Season Guide',
+        excerpt: 'When to see the living root bridges at their best, when Cherrapunji actually lives up to its rainfall reputation, and when the roads are easiest to drive.',
+        meta_description: 'A season-by-season guide to visiting Meghalaya — when to see the living root bridges, Dawki river, and Cherrapunji waterfalls at their best, and what the monsoon actually means for your trip.',
+        tags: ['Meghalaya', 'Planning', 'Best Time to Visit'],
+        cover_image: 'assets/destinations/meghalaya.jpg',
+        status: 'published',
+        published_at: now,
+        content: `## The short answer
+
+October to April is the most reliable window for a first visit to Meghalaya — clear skies, comfortable temperatures, and dry roads. But the "best" time really depends on what you're going for, so here's the honest breakdown by season.
+
+## October to April — clear views, easy roads
+
+This is peak season for a reason. The monsoon has cleared out, mountain views open up properly, and the roads into Cherrapunji and Dawki are at their most predictable. Winter mornings (December–February) can be genuinely cold at altitude, so pack layers. This is also when Dawki's river is at its clearest — the "glass water" photos you've seen are almost always shot in this window.
+
+## June to September — the monsoon, and why it's not a dealbreaker
+
+Meghalaya means "abode of clouds," and Cherrapunji is one of the wettest inhabited places on Earth — the monsoon isn't a footnote here, it's the main event. Waterfalls are at their most dramatic, the landscape turns a genuinely different shade of green, and the living root bridges (which need consistent moisture to keep growing) look exactly as they're supposed to. The trade-off: some roads and river crossings become unpredictable day to day, and a few outdoor activities get called off on short notice. If you're flexible and want to see Meghalaya at its most alive, this season has real appeal — just don't lock in a tight schedule.
+
+## May and October — the shoulder months
+
+These two transition months are underrated. May sits just before the monsoon properly sets in — you get some of the greenery without the road unpredictability. October, right after the monsoon ends, is arguably the single best month: waterfalls are still full, the landscape hasn't dried out yet, and the clear-sky season is just beginning.
+
+## Our take
+
+If this is your first trip and you want reliability, aim for October–April. If you've been before, or you specifically want to see the region at its greenest and don't mind a looser itinerary, the monsoon months are worth it. Either way, [our Meghalaya packages](/packages.html) are built around the season you're travelling in, not a fixed template.`
+      },
+      {
+        slug: 'first-timers-guide-northeast-india-road-trip',
+        title: "A First-Timer's Guide to Planning a Northeast India Road Trip",
+        excerpt: "Northeast India isn't one destination — it's eight states with wildly different terrain, permit rules, and road conditions. Here's how to actually plan around that.",
+        meta_description: "A practical first-timer's guide to planning a Northeast India road trip — how to choose a region, what permits you'll need, how to pick a vehicle, and how much time to actually budget.",
+        tags: ['Planning', 'Road Trips', 'First-Timer Tips'],
+        cover_image: 'assets/destinations/anini.jpg',
+        status: 'published',
+        published_at: now,
+        content: `## Start with one region, not all of Northeast India
+
+The single biggest planning mistake first-timers make is trying to cover too much ground. "Northeast India" is eight states — Assam, Meghalaya, Sikkim, Arunachal Pradesh, Nagaland, Manipur, Mizoram, and Tripura — each with different terrain, permit requirements, and road quality. A realistic first trip picks one region and goes deep rather than skimming several.
+
+**Good first-trip combinations:**
+- Meghalaya alone (Shillong, Cherrapunji, Dawki) — the most accessible, no permit required for Indian nationals
+- Meghalaya + Sikkim as two separate legs
+- Sikkim alone, if high-altitude scenery is the priority
+
+**Save for a second trip:** Arunachal Pradesh's remote routes (Anini, Dong Valley, Kaho) — these reward people who already know what they're getting into.
+
+## Check permit requirements before you set dates
+
+If your route touches Arunachal Pradesh, Nagaland, Mizoram, or the border areas of Sikkim, you'll need a permit sorted before you travel — see our [full ILP permit guide](/blog-post.html?slug=ilp-permit-guide-northeast-india) for exactly what's required. This affects your timeline more than almost anything else, so check it first, before you book flights.
+
+## Picking a vehicle actually matters here
+
+Northeast India's mountain roads are a different category from a flat highway drive. For anything touching Meghalaya's plateau roads, Sikkim's mountain passes, or Arunachal Pradesh's more remote stretches, an SUV with a driver who knows the specific route beats a sedan and a GPS app every time — especially in monsoon season, when local knowledge of which river crossings are currently passable is genuinely the difference between a smooth day and a stuck one.
+
+## Budget more travel days than you think you need
+
+Mountain roads are slow by design — winding, single-lane in places, and weather-dependent. A route that looks like "3 hours" on a map can easily take 5–6. Build buffer days into any itinerary rather than a tight day-by-day schedule, particularly if you're combining multiple regions.
+
+## A rough first-timer timeline
+
+- **3–4 days:** enough for a focused Meghalaya loop
+- **5–6 days:** Sikkim's main circuit, or a slightly deeper Meghalaya trip
+- **7+ days:** combining two regions, or a proper remote Arunachal Pradesh route
+
+If you're not sure where to start, [tell us your dates and interests](/index.html#contact) and we'll help you figure out a realistic first route rather than an overly ambitious one.`
+      }
+    ];
+    for (const p of posts) {
+      await BlogPost.create({ ...p, id: await nextId('blog_posts'), created_at: now, updated_at: now });
+    }
+  }
+
   const settingCount = await Setting.countDocuments();
   if (settingCount === 0) {
     const settings = [
@@ -487,7 +618,8 @@ module.exports = {
       inclusions: parseArrayField(data.inclusions),
       exclusions: parseArrayField(data.exclusions),
       highlights: parseArrayField(data.highlights),
-      route_stops: parseArrayField(data.route_stops)
+      route_stops: parseArrayField(data.route_stops),
+      gallery_images: parseArrayField(data.gallery_images)
     });
     return { lastInsertRowid: id };
   },
@@ -497,7 +629,8 @@ module.exports = {
     inclusions: parseArrayField(data.inclusions),
     exclusions: parseArrayField(data.exclusions),
     highlights: parseArrayField(data.highlights),
-    route_stops: parseArrayField(data.route_stops)
+    route_stops: parseArrayField(data.route_stops),
+    gallery_images: parseArrayField(data.gallery_images)
   }),
   deletePackage: (id) => Package.deleteOne({ id }),
 
@@ -609,6 +742,39 @@ module.exports = {
   },
 
   deleteAvailabilityBlock: (id) => AvailabilityBlock.deleteOne({ id }),
+
+  // ─── Blog ───────────────────────────────────────────────────────────────
+  getPublishedBlogPosts: () => BlogPost.find({ status: 'published' }).sort({ published_at: -1 }).then(plainAll),
+  getAllBlogPosts: async () => {
+    const docs = await BlogPost.find().then(plainAll);
+    return docs.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+  },
+  getBlogPostBySlug: (slug) => BlogPost.findOne({ slug }).then(plain),
+  getBlogPostById: (id) => BlogPost.findOne({ id }).then(plain),
+  createBlogPost: async (data) => {
+    const id = await nextId('blog_posts');
+    const now = new Date().toISOString();
+    await BlogPost.create({
+      ...data, id,
+      tags: parseArrayField(data.tags),
+      published_at: data.status === 'published' ? (data.published_at || now) : null,
+      created_at: now, updated_at: now
+    });
+    return { lastInsertRowid: id };
+  },
+  updateBlogPost: async (id, data) => {
+    const existing = await BlogPost.findOne({ id });
+    const wasPublished = existing && existing.status === 'published';
+    const nowPublishing = data.status === 'published';
+    return BlogPost.updateOne({ id }, {
+      ...data,
+      tags: parseArrayField(data.tags),
+      // Set published_at the first time a post goes live; never overwrite it on later edits.
+      published_at: (!wasPublished && nowPublishing) ? new Date().toISOString() : (existing ? existing.published_at : null),
+      updated_at: new Date().toISOString()
+    });
+  },
+  deleteBlogPost: (id) => BlogPost.deleteOne({ id }),
 
   // ─── Payment transactions ─────────────────────────────────────────────────
   createPaymentTransaction: async (data) => {

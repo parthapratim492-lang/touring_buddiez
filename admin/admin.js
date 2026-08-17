@@ -7,8 +7,8 @@
 // ─── State ───────────────────────────────────────────────────────────────────
 let currentSection = 'dashboard';
 let allPackages = [], allRentals = [], allGallery = [], allTestimonials = [];
-let allBookings = [], allEnquiries = [], allPayments = [];
-let editingPackageId = null, editingRentalId = null, editingTestimonialId = null;
+let allBookings = [], allEnquiries = [], allPayments = [], allBlogPosts = [];
+let editingPackageId = null, editingRentalId = null, editingTestimonialId = null, editingBlogId = null;
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
@@ -144,7 +144,7 @@ function showSection(name) {
   const titles = {
     dashboard: 'Dashboard', packages: 'Tour Packages', bookings: 'Bookings', enquiries: 'Enquiries',
     rentals: 'Rental Vehicles', availability: 'Package Availability', gallery: 'Gallery', testimonials: 'Testimonials',
-    payments: 'Payments', settings: 'Site Settings', account: 'Change Password'
+    blog: 'Blog', payments: 'Payments', settings: 'Site Settings', account: 'Change Password'
   };
   document.getElementById('topbar-title').textContent = titles[name] || name;
 
@@ -157,6 +157,7 @@ function showSection(name) {
   else if (name === 'availability') loadAvailability();
   else if (name === 'gallery') loadGallery();
   else if (name === 'testimonials') loadTestimonials();
+  else if (name === 'blog') loadBlogPosts();
   else if (name === 'payments') { loadPaymentSettings(); loadPaymentTransactions(); }
   else if (name === 'settings') loadSettings();
 }
@@ -470,6 +471,26 @@ function openPackageForm(pkg = null) {
       </div>
 
       <div class="form-section">
+        <h4>Additional Gallery Photos</h4>
+        <p style="font-size:.8rem;color:var(--slate-500);margin:-.2rem 0 .7rem">Shown as a photo gallery on this trip's page, separate from the main card image above.</p>
+        ${pkg ? `
+          <div class="gallery-images-grid" id="pkg-gallery-grid">
+            ${(pkg.gallery_images || []).map(img => `
+              <div class="gallery-thumb">
+                <img src="/${esc(img)}" alt="">
+                <button type="button" onclick="deletePackageGalleryImage(${pkg.id}, '${esc(img).replace(/'/g, "\\'")}')" title="Remove"><i class="fa-solid fa-xmark"></i></button>
+              </div>
+            `).join('') || '<p style="font-size:.82rem;color:var(--slate-300)">No extra photos yet.</p>'}
+          </div>
+          <div class="upload-zone" id="pkg-gallery-zone" onclick="document.getElementById('pkg-gallery-input').click()">
+            <i class="fa-solid fa-images"></i>
+            <p>Click to add photos<br><small>Select multiple at once — uploads immediately</small></p>
+            <input type="file" id="pkg-gallery-input" accept="image/*" multiple>
+          </div>
+        ` : `<p style="font-size:.85rem;color:var(--slate-500)">Save this package first, then reopen it to add gallery photos.</p>`}
+      </div>
+
+      <div class="form-section">
         <button type="button" class="collapse-toggle" onclick="toggleCollapse('itin-body', this)">
           <i class="fa-solid fa-chevron-right"></i> Itinerary (${itin.length} days)
         </button>
@@ -564,8 +585,37 @@ function openPackageForm(pkg = null) {
     });
   });
 
+  // Additional gallery photos — uploads immediately on selection, separate
+  // from the main form (this package already exists, so there's a real ID
+  // to attach photos to right away rather than waiting for form submit).
+  const galleryInput = document.getElementById('pkg-gallery-input');
+  if (galleryInput && pkg) {
+    galleryInput.addEventListener('change', async function() {
+      if (!this.files.length) return;
+      const fd = new FormData();
+      Array.from(this.files).forEach(f => fd.append('images', f));
+      try {
+        await api('POST', `/api/packages/${pkg.id}/gallery`, fd, true);
+        toast('Photos added');
+        const fresh = await api('GET', `/api/packages/${pkg.slug}`);
+        openPackageForm(fresh); // reopen with the updated gallery list
+      } catch (ex) { toast('Error: ' + ex.message, true); }
+    });
+  }
+
   // Form submit
   document.getElementById('pkg-form').addEventListener('submit', savePackage);
+}
+
+async function deletePackageGalleryImage(packageId, imagePath) {
+  if (!confirm('Remove this photo from the gallery?')) return;
+  try {
+    await api('DELETE', `/api/packages/${packageId}/gallery`, { image_path: imagePath });
+    toast('Photo removed');
+    const pkg = allPackages.find(p => p.id === packageId);
+    const fresh = pkg ? await api('GET', `/api/packages/${pkg.slug}`) : null;
+    if (fresh) openPackageForm(fresh);
+  } catch (ex) { toast('Error: ' + ex.message, true); }
 }
 
 function itinDayHtml(i, title = '', content = '') {
@@ -1417,6 +1467,169 @@ async function loadSettings() {
       if (el) el.value = v;
     });
   } catch (ex) { toast('Failed to load settings', true); }
+}
+
+// ─── BLOG ─────────────────────────────────────────────────────────────────────
+async function loadBlogPosts() {
+  try {
+    allBlogPosts = await api('GET', '/api/admin/blog');
+    renderBlogTable();
+  } catch (ex) { toast('Failed to load blog posts', true); }
+}
+
+function renderBlogTable() {
+  const tbody = document.getElementById('blog-tbody');
+  if (!allBlogPosts.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--slate-300)">No posts yet — write your first guide.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = allBlogPosts.map(p => `
+    <tr>
+      <td><span class="status-pill ${p.status === 'published' ? 'approved' : 'pending'}">${esc(p.status)}</span></td>
+      <td><strong>${esc(p.title)}</strong></td>
+      <td style="font-size:.8rem;color:var(--slate-500)">${(p.tags || []).map(t => esc(t)).join(', ') || '–'}</td>
+      <td style="white-space:nowrap;font-size:.8rem;color:var(--slate-300)">${p.published_at ? fmtDate(p.published_at) : '–'}</td>
+      <td>
+        <div class="row-actions">
+          <button class="btn-edit" onclick="editBlogPost(${p.id})"><i class="fa-solid fa-pen"></i></button>
+          <a href="/blog-post.html?slug=${esc(p.slug)}" target="_blank" class="btn-edit" title="View live"><i class="fa-solid fa-eye"></i></a>
+          <button class="btn-delete" onclick="deleteBlogPost(${p.id}, '${esc(p.title).replace(/'/g, "\\'")}')"><i class="fa-solid fa-trash"></i></button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function openBlogForm(post = null) {
+  editingBlogId = post ? post.id : null;
+  const title = post ? 'Edit Post' : 'New Post';
+
+  const html = `
+    <form id="blog-form">
+      <div class="form-section">
+        <div class="field-row">
+          <div class="field">
+            <label for="blog-title">Title *</label>
+            <input id="blog-title" type="text" name="title" value="${esc(post?.title || '')}" required placeholder="e.g. Best Time to Visit Meghalaya">
+          </div>
+          <div class="field">
+            <label for="blog-slug">URL Slug *</label>
+            <input id="blog-slug" type="text" name="slug" value="${esc(post?.slug || '')}" required placeholder="e.g. best-time-to-visit-meghalaya">
+          </div>
+        </div>
+        <div class="field">
+          <label for="blog-excerpt">Excerpt</label>
+          <textarea id="blog-excerpt" name="excerpt" rows="2" placeholder="One or two sentences shown on the blog listing page">${esc(post?.excerpt || '')}</textarea>
+        </div>
+        <div class="field">
+          <label for="blog-tags">Tags (comma-separated)</label>
+          <input id="blog-tags" type="text" name="tags_raw" value="${(post?.tags || []).map(esc).join(', ')}" placeholder="Meghalaya, Planning, Best Time to Visit">
+        </div>
+        <div class="field">
+          <label for="blog-meta">Meta Description (for search engines)</label>
+          <input id="blog-meta" type="text" name="meta_description" value="${esc(post?.meta_description || '')}" placeholder="Shown under the title in Google search results">
+        </div>
+        <div class="field">
+          <label for="blog-status">Status</label>
+          <select id="blog-status" name="status">
+            <option value="draft" ${post?.status !== 'published' ? 'selected' : ''}>Draft</option>
+            <option value="published" ${post?.status === 'published' ? 'selected' : ''}>Published</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h4>Cover Image</h4>
+        ${post?.cover_image ? `<div class="current-image-wrap"><img src="/${esc(post.cover_image)}" alt="Current cover"></div>` : ''}
+        <div class="upload-zone" id="blog-img-zone" onclick="document.getElementById('blog-img-input').click()">
+          <i class="fa-solid fa-cloud-arrow-up"></i>
+          <p>${post?.cover_image ? 'Click to replace image' : 'Click to upload image'}<br><small>JPG, PNG, WebP — max 15MB</small></p>
+          <input type="file" id="blog-img-input" accept="image/*">
+        </div>
+        <div class="image-preview" id="blog-img-preview"></div>
+        <input type="hidden" name="existing_cover_image" value="${esc(post?.cover_image || '')}">
+      </div>
+
+      <div class="form-section">
+        <h4>Content</h4>
+        <p style="font-size:.8rem;color:var(--slate-500);margin:-.2rem 0 .7rem">
+          Simple formatting: start a line with <code>## </code> for a heading, leave a blank line between paragraphs,
+          use <code>**text**</code> for bold, and <code>- </code> at the start of a line for a bullet list.
+        </p>
+        <textarea id="blog-content" name="content" rows="16" placeholder="Write the full article here...">${esc(post?.content || '')}</textarea>
+      </div>
+
+      <div style="display:flex;gap:.75rem;margin-top:1rem">
+        <button type="submit" class="btn-primary"><i class="fa-solid fa-floppy-disk"></i> ${post ? 'Save Changes' : 'Create Post'}</button>
+        <button type="button" class="btn-secondary" onclick="closeModal()">Cancel</button>
+      </div>
+    </form>
+  `;
+
+  openModal(title, html);
+
+  // Slug auto-fill from title, only while creating a new post
+  document.getElementById('blog-title').addEventListener('input', (e) => {
+    if (!editingBlogId) {
+      document.getElementById('blog-slug').value =
+        e.target.value.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    }
+  });
+
+  // Cover image preview
+  document.getElementById('blog-img-input').addEventListener('change', function() {
+    const preview = document.getElementById('blog-img-preview');
+    preview.innerHTML = '';
+    Array.from(this.files).forEach(f => {
+      const img = document.createElement('img');
+      img.src = URL.createObjectURL(f);
+      preview.appendChild(img);
+    });
+  });
+
+  document.getElementById('blog-form').addEventListener('submit', saveBlogPost);
+}
+
+async function saveBlogPost(e) {
+  e.preventDefault();
+  const form = e.target;
+  const fd = new FormData(form);
+
+  // Tags come in as a single comma-separated text field — convert to the
+  // JSON array format the backend expects (same convention as inclusions/
+  // exclusions/highlights on the package form).
+  const tagsRaw = fd.get('tags_raw') || '';
+  fd.delete('tags_raw');
+  fd.append('tags', JSON.stringify(tagsRaw.split(',').map(t => t.trim()).filter(Boolean)));
+
+  const imgInput = document.getElementById('blog-img-input');
+  if (imgInput.files[0]) fd.append('cover_image', imgInput.files[0]);
+
+  try {
+    if (editingBlogId) {
+      await api('PUT', `/api/blog/${editingBlogId}`, fd, true);
+      toast('Post updated!');
+    } else {
+      await api('POST', '/api/blog', fd, true);
+      toast('Post created!');
+    }
+    closeModal();
+    loadBlogPosts();
+  } catch (ex) { toast('Error: ' + ex.message, true); }
+}
+
+function editBlogPost(id) {
+  const post = allBlogPosts.find(p => p.id === id);
+  if (post) openBlogForm(post);
+}
+
+async function deleteBlogPost(id, title) {
+  if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
+  try {
+    await api('DELETE', `/api/blog/${id}`);
+    toast('Post deleted');
+    loadBlogPosts();
+  } catch (ex) { toast('Error: ' + ex.message, true); }
 }
 
 // ─── PAYMENTS ─────────────────────────────────────────────────────────────────

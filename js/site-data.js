@@ -449,6 +449,15 @@
             </div>
           ` : ''}
 
+          ${Array.isArray(pkg.gallery_images) && pkg.gallery_images.length ? `
+            <h2>Photos from this trip</h2>
+            <div class="pkg-gallery-grid">
+              ${pkg.gallery_images.map(img => `
+                <div class="g-item"><img src="/${esc(img)}" alt="${esc(pkg.name)} photo" loading="lazy"></div>
+              `).join('')}
+            </div>
+          ` : ''}
+
           ${itin.length ? `
             <h2>Suggested Itinerary</h2>
             <div class="pkg-itinerary">
@@ -536,6 +545,7 @@
       });
     }
 
+    if (window.__initGallerySlideshow) window.__initGallerySlideshow();
     renderAvailabilityCalendar(pkg.slug);
   }
 

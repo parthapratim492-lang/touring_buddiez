@@ -12,7 +12,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const Razorpay = require('razorpay');
 const db = require('./db/database');
-const { sendBookingConfirmedEmail } = require('./lib/mailer');
+const { sendBookingConfirmedEmail, sendAdminNewBookingEmail, sendAdminNewEnquiryEmail } = require('./lib/mailer');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -289,6 +289,7 @@ app.put('/api/packages/:id', requireAuth, upload.single('image'), async (req, re
       exclusions: exclusions || '[]',
       highlights: highlights || '[]',
       route_stops: route_stops || '[]',
+      gallery_images: existing.gallery_images || [], // this form doesn't touch gallery photos — preserve them
       featured: featured === 'true' || featured === '1' ? 1 : 0,
       display_order: parseInt(display_order) || 0
     };
@@ -305,6 +306,44 @@ app.delete('/api/packages/:id', requireAuth, async (req, res) => {
   try {
     await db.deletePackage(parseInt(req.params.id));
     res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Extra photos for a package's detail-page gallery, separate from its one
+// cover image. Appends to whatever's already there rather than replacing.
+app.post('/api/packages/:id/gallery', requireAuth, upload.array('images', 20), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const pkg = await db.getPackageById(id);
+    if (!pkg) return res.status(404).json({ error: 'Package not found' });
+    if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'No images uploaded' });
+
+    const newPaths = req.files.map(f => 'uploads/' + f.filename);
+    const gallery_images = [...(Array.isArray(pkg.gallery_images) ? pkg.gallery_images : []), ...newPaths];
+    await db.updatePackage(id, { ...pkg, gallery_images });
+    res.json({ ok: true, gallery_images });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/packages/:id/gallery', requireAuth, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { image_path } = req.body;
+    const pkg = await db.getPackageById(id);
+    if (!pkg) return res.status(404).json({ error: 'Package not found' });
+
+    const gallery_images = (Array.isArray(pkg.gallery_images) ? pkg.gallery_images : []).filter(p => p !== image_path);
+    await db.updatePackage(id, { ...pkg, gallery_images });
+
+    if (image_path && image_path.startsWith('uploads/')) {
+      const fullPath = path.join(DATA_DIR, image_path);
+      if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+    }
+    res.json({ ok: true, gallery_images });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -489,6 +528,90 @@ app.delete('/api/gallery/:id', requireAuth, async (req, res) => {
   }
 });
 
+// ─── Blog ─────────────────────────────────────────────────────────────────────
+
+app.get('/api/blog', async (req, res) => {
+  try {
+    res.json(await db.getPublishedBlogPosts());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/blog/:slug', async (req, res) => {
+  try {
+    const post = await db.getBlogPostBySlug(req.params.slug);
+    if (!post || post.status !== 'published') return res.status(404).json({ error: 'Post not found' });
+    res.json(post);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/admin/blog', requireAuth, async (req, res) => {
+  try {
+    res.json(await db.getAllBlogPosts());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/blog', requireAuth, upload.single('cover_image'), async (req, res) => {
+  try {
+    const { slug, title, excerpt, content, tags, meta_description, status } = req.body;
+    if (!slug || !title) return res.status(400).json({ error: 'Slug and title are required' });
+
+    const existing = await db.getBlogPostBySlug(slug);
+    if (existing) return res.status(409).json({ error: 'A post with this slug already exists' });
+
+    let cover_image = req.body.existing_cover_image || '';
+    if (req.file) cover_image = 'uploads/' + req.file.filename;
+
+    const result = await db.createBlogPost({
+      slug: slug.toLowerCase().replace(/\s+/g, '-'),
+      title, excerpt, content: content || '', cover_image,
+      tags: tags || '[]', meta_description,
+      status: status === 'published' ? 'published' : 'draft'
+    });
+    res.json({ ok: true, id: result.lastInsertRowid });
+  } catch (err) {
+    console.error('Create blog post error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/blog/:id', requireAuth, upload.single('cover_image'), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const existing = await db.getBlogPostById(id);
+    if (!existing) return res.status(404).json({ error: 'Post not found' });
+
+    const { slug, title, excerpt, content, tags, meta_description, status } = req.body;
+    let cover_image = req.body.existing_cover_image || existing.cover_image;
+    if (req.file) cover_image = 'uploads/' + req.file.filename;
+
+    await db.updateBlogPost(id, {
+      slug: slug.toLowerCase().replace(/\s+/g, '-'),
+      title, excerpt, content: content || '', cover_image,
+      tags: tags || '[]', meta_description,
+      status: status === 'published' ? 'published' : 'draft'
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Update blog post error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/blog/:id', requireAuth, async (req, res) => {
+  try {
+    await db.deleteBlogPost(parseInt(req.params.id));
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Testimonials ─────────────────────────────────────────────────────────────
 
 // Public homepage feed — approved reviews only. Never seeded, never faked.
@@ -616,7 +739,7 @@ app.post('/api/bookings', async (req, res) => {
     }
     bookingSubmitTimestamps.set(ip, Date.now());
 
-    const result = await db.createBooking({
+    const newBooking = {
       name: name.trim().slice(0, 100),
       phone: phone.trim().slice(0, 30),
       email: (email || '').trim().slice(0, 200),
@@ -625,8 +748,15 @@ app.post('/api/bookings', async (req, res) => {
       travel_date: (travel_date || '').trim().slice(0, 50),
       group_size: (group_size || '').trim().slice(0, 50),
       message: (message || '').trim().slice(0, 1000)
-    });
+    };
+    const result = await db.createBooking(newBooking);
     res.json({ ok: true, id: result.lastInsertRowid });
+
+    // Fire-and-forget: let the admin know a new booking came in. Runs after
+    // the response is sent so a slow/failed email never delays the visitor.
+    db.getSetting('email').then((adminEmail) => {
+      if (adminEmail) sendAdminNewBookingEmail(adminEmail, newBooking).catch(() => {});
+    }).catch(() => {});
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -699,14 +829,20 @@ app.post('/api/enquiries', async (req, res) => {
     }
     enquirySubmitTimestamps.set(ip, Date.now());
 
-    const result = await db.createEnquiry({
+    const newEnquiry = {
       name: name.trim().slice(0, 100),
       phone: (phone || '').trim().slice(0, 30),
       email: (email || '').trim().slice(0, 200),
       message: message.trim().slice(0, 1000),
       source: (source || 'contact_form').trim().slice(0, 50)
-    });
+    };
+    const result = await db.createEnquiry(newEnquiry);
     res.json({ ok: true, id: result.lastInsertRowid });
+
+    // Fire-and-forget: let the admin know a new enquiry came in.
+    db.getSetting('email').then((adminEmail) => {
+      if (adminEmail) sendAdminNewEnquiryEmail(adminEmail, newEnquiry).catch(() => {});
+    }).catch(() => {});
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

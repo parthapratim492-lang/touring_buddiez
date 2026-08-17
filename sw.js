@@ -10,7 +10,7 @@
      below, so a deploy invalidates them automatically).
    ============================================================ */
 
-const CACHE_NAME = 'touring-buddiez-v12';
+const CACHE_NAME = 'touring-buddiez-v13';
 
 const PRECACHE_URLS = [
   '/index.html',
