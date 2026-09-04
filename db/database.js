@@ -1,324 +1,311 @@
-const mongoose = require('mongoose');
+const Database = require('better-sqlite3');
 const bcrypt = require('bcryptjs');
+const path = require('path');
+const fs = require('fs');
 
-// ─── Connection ─────────────────────────────────────────────────────────────
-// Render's free-tier disk is ephemeral — anything written to a local file
-// (including the old SQLite .db) is wiped on every restart/redeploy. MongoDB
-// Atlas is a separate, always-on database, so admin edits now actually persist.
+// DATA_DIR (set via env var in production) points the database at a
+// persistent disk mount instead of the app folder — see server.js for why.
+// Falls back to this file's own folder for local development.
+const DATA_DIR = process.env.DATA_DIR || __dirname;
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+const DB_PATH = path.join(DATA_DIR, 'touring_buddiez.db');
+const db = new Database(DB_PATH);
 
-const MONGODB_URI = process.env.MONGODB_URI;
-if (!MONGODB_URI) {
-  console.error(
-    '\n[FATAL] MONGODB_URI is not set. This app now requires a MongoDB ' +
-    'connection string — see MONGODB_SETUP.md for how to create a free ' +
-    'Atlas cluster and set this environment variable.\n'
+// Enable WAL mode for better performance
+db.pragma('journal_mode = WAL');
+db.pragma('foreign_keys = ON');
+
+// ─── Schema ───────────────────────────────────────────────────────────────────
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS admin_users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL
   );
-  process.exit(1);
-}
 
-mongoose.set('strictQuery', true);
-
-let connectedOnce = false;
-mongoose.connection.on('connected', () => {
-  connectedOnce = true;
-  console.log('[db] Connected to MongoDB');
-});
-mongoose.connection.on('error', (err) => {
-  console.error('[db] MongoDB connection error:', err.message);
-});
-mongoose.connection.on('disconnected', () => {
-  if (connectedOnce) console.warn('[db] MongoDB disconnected — will retry automatically.');
-});
-
-mongoose.connect(MONGODB_URI).catch((err) => {
-  console.error('[FATAL] Could not connect to MongoDB:', err.message);
-  process.exit(1);
-});
-
-// ─── Auto-increment id helper ───────────────────────────────────────────────
-// Keeps every document's public `id` field a small integer (1, 2, 3…) instead
-// of a Mongo ObjectId, so nothing on the front end (admin.js, site-data.js)
-// had to change — they already expect plain numeric ids.
-
-const counterSchema = new mongoose.Schema({ _id: String, seq: { type: Number, default: 0 } });
-const Counter = mongoose.model('Counter', counterSchema);
-
-async function nextId(name) {
-  const doc = await Counter.findByIdAndUpdate(
-    name,
-    { $inc: { seq: 1 } },
-    { new: true, upsert: true }
+  CREATE TABLE IF NOT EXISTS packages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    route TEXT,
+    duration TEXT,
+    group_size TEXT,
+    vehicle TEXT,
+    price TEXT,
+    image_path TEXT,
+    description TEXT,
+    itinerary TEXT DEFAULT '[]',
+    inclusions TEXT DEFAULT '[]',
+    exclusions TEXT DEFAULT '[]',
+    highlights TEXT DEFAULT '[]',
+    route_stops TEXT DEFAULT '[]',
+    featured INTEGER DEFAULT 0,
+    display_order INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
   );
-  return doc.seq;
-}
 
-// ─── Schemas ────────────────────────────────────────────────────────────────
+  CREATE TABLE IF NOT EXISTS rentals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    seats TEXT,
+    tags TEXT DEFAULT '[]',
+    image_path TEXT,
+    whatsapp TEXT,
+    display_order INTEGER DEFAULT 0
+  );
 
-const AdminUserSchema = new mongoose.Schema({
-  id: { type: Number, unique: true },
-  username: { type: String, unique: true, required: true },
-  password_hash: { type: String, required: true }
-});
+  CREATE TABLE IF NOT EXISTS gallery (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    image_path TEXT NOT NULL,
+    alt_text TEXT,
+    is_tall INTEGER DEFAULT 0,
+    display_order INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
 
-const PackageSchema = new mongoose.Schema({
-  id: { type: Number, unique: true },
-  slug: { type: String, unique: true, required: true },
-  name: { type: String, required: true },
-  route: String,
-  duration: String,
-  group_size: String,
-  vehicle: String,
-  price: String,
-  image_path: String,
-  gallery_images: { type: Array, default: [] },
-  description: String,
-  itinerary: { type: Array, default: [] },
-  inclusions: { type: Array, default: [] },
-  exclusions: { type: Array, default: [] },
-  highlights: { type: Array, default: [] },
-  route_stops: { type: Array, default: [] },
-  featured: { type: Number, default: 0 },
-  display_order: { type: Number, default: 0 },
-  created_at: { type: String, default: () => new Date().toISOString() }
-});
+  CREATE TABLE IF NOT EXISTS testimonials (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    package_name TEXT,
+    quote TEXT,
+    rating INTEGER DEFAULT 5,
+    display_order INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'pending',
+    email TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
 
-const RentalSchema = new mongoose.Schema({
-  id: { type: Number, unique: true },
-  name: { type: String, required: true },
-  seats: String,
-  tags: { type: Array, default: [] },
-  image_path: String,
-  whatsapp: String,
-  display_order: { type: Number, default: 0 }
-});
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT
+  );
 
-const GallerySchema = new mongoose.Schema({
-  id: { type: Number, unique: true },
-  image_path: { type: String, required: true },
-  alt_text: String,
-  location: String,
-  is_tall: { type: Number, default: 0 },
-  display_order: { type: Number, default: 0 },
-  created_at: { type: String, default: () => new Date().toISOString() }
-});
+  CREATE TABLE IF NOT EXISTS bookings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    email TEXT,
+    package_slug TEXT,
+    package_name TEXT,
+    travel_date TEXT,
+    group_size TEXT,
+    message TEXT,
+    status TEXT DEFAULT 'pending',
+    created_at TEXT DEFAULT (datetime('now'))
+  );
 
-const TestimonialSchema = new mongoose.Schema({
-  id: { type: Number, unique: true },
-  name: { type: String, required: true },
-  package_name: String,
-  quote: String,
-  rating: { type: Number, default: 5 },
-  display_order: { type: Number, default: 0 },
-  status: { type: String, default: 'pending' },
-  email: String,
-  created_at: { type: String, default: () => new Date().toISOString() }
-});
+  CREATE TABLE IF NOT EXISTS enquiries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    phone TEXT,
+    email TEXT,
+    message TEXT,
+    source TEXT DEFAULT 'contact_form',
+    status TEXT DEFAULT 'new',
+    created_at TEXT DEFAULT (datetime('now'))
+  );
 
-const SettingSchema = new mongoose.Schema({
-  key: { type: String, unique: true, required: true },
-  value: String
-}, { _id: false });
+  CREATE TABLE IF NOT EXISTS availability (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    package_slug TEXT NOT NULL,
+    start_date TEXT NOT NULL,
+    end_date TEXT NOT NULL,
+    reason TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+`);
 
-const BookingSchema = new mongoose.Schema({
-  id: { type: Number, unique: true },
-  name: { type: String, required: true },
-  phone: { type: String, required: true },
-  email: String,
-  package_slug: String,
-  package_name: String,
-  travel_date: String,
-  group_size: String,
-  message: String,
-  status: { type: String, default: 'pending' },
-  created_at: { type: String, default: () => new Date().toISOString() }
-});
+// ─── Lightweight migration (for DBs created before status/email/created_at existed) ──
+(function migrateTestimonials() {
+  const cols = db.prepare(`PRAGMA table_info(testimonials)`).all().map(c => c.name);
+  if (!cols.includes('status')) db.exec(`ALTER TABLE testimonials ADD COLUMN status TEXT DEFAULT 'pending'`);
+  if (!cols.includes('email')) db.exec(`ALTER TABLE testimonials ADD COLUMN email TEXT`);
+  if (!cols.includes('created_at')) db.exec(`ALTER TABLE testimonials ADD COLUMN created_at TEXT DEFAULT (datetime('now'))`);
+})();
 
-const AvailabilityBlockSchema = new mongoose.Schema({
-  id: { type: Number, unique: true },
-  package_slug: { type: String, required: true },
-  start_date: { type: String, required: true },
-  end_date: { type: String, required: true },
-  reason: String,
-  created_at: { type: String, default: () => new Date().toISOString() }
-});
+// ─── Lightweight migration (for DBs created before route_stops existed) ──────
+(function migratePackages() {
+  const cols = db.prepare(`PRAGMA table_info(packages)`).all().map(c => c.name);
+  if (!cols.includes('route_stops')) db.exec(`ALTER TABLE packages ADD COLUMN route_stops TEXT DEFAULT '[]'`);
+  if (!cols.includes('price')) db.exec(`ALTER TABLE packages ADD COLUMN price TEXT`);
 
-const EnquirySchema = new mongoose.Schema({
-  id: { type: Number, unique: true },
-  name: { type: String, required: true },
-  phone: String,
-  email: String,
-  message: String,
-  source: { type: String, default: 'contact_form' },
-  status: { type: String, default: 'new' },
-  created_at: { type: String, default: () => new Date().toISOString() }
-});
+  // Backfill route stops for the 5 built-in destinations on databases that
+  // already existed before this feature shipped (seed() only inserts rows
+  // when the table is empty, so upgraders wouldn't otherwise get this data).
+  const backfill = {
+    meghalaya: [
+      { day: 1, name: 'Guwahati (Pickup)', lat: 26.1445, lng: 91.7362, note: 'Airport / railway station pickup.' },
+      { day: 1, name: 'Shillong', lat: 25.5788, lng: 91.8933, note: "Police Bazar & Ward's Lake." },
+      { day: 2, name: 'Cherrapunji', lat: 25.2702, lng: 91.7323, note: 'Nohkalikai Falls, Mawsmai Cave, living root bridges.' },
+      { day: 3, name: 'Dawki', lat: 25.1966, lng: 92.0202, note: 'Boat ride on the Umngot river, then return.' }
+    ],
+    bhutan: [
+      { day: 1, name: 'Paro (Arrival)', lat: 27.4287, lng: 89.4164, note: 'Arrival at Paro airport, transfer onward.' },
+      { day: 1, name: 'Thimphu', lat: 27.4712, lng: 89.6339, note: 'Evening walk around the capital.' },
+      { day: 2, name: 'Thimphu Sightseeing', lat: 27.4712, lng: 89.6339, note: 'Buddha Dordenma, Folk Heritage Museum, Tashichho Dzong.' },
+      { day: 3, name: 'Punakha', lat: 27.5921, lng: 89.8797, note: 'Punakha Dzong, Chimi Lhakhang fertility temple.' },
+      { day: 4, name: "Paro Taktsang (Tiger's Nest)", lat: 27.4915, lng: 89.3637, note: 'The classic cliffside monastery hike.' },
+      { day: 5, name: 'Paro (Departure)', lat: 27.4287, lng: 89.4164, note: 'Transfer to Paro airport for departure.' }
+    ],
+    sikkim: [
+      { day: 1, name: 'NJP / Bagdogra (Pickup)', lat: 26.7271, lng: 88.3953, note: 'Arrival transfer up to Gangtok.' },
+      { day: 1, name: 'Gangtok', lat: 27.3389, lng: 88.6065, note: 'MG Marg evening walk.' },
+      { day: 2, name: 'Tsomgo Lake & Nathula', lat: 27.3747, lng: 88.7601, note: 'Glacial lake; Nathula Pass subject to permits.' },
+      { day: 3, name: 'Rumtek Monastery', lat: 27.2836, lng: 88.5614, note: 'Rumtek, Enchey Monastery, Do-Drul Chorten.' },
+      { day: 4, name: 'NJP / Bagdogra (Departure)', lat: 26.7271, lng: 88.3953, note: 'Drive back for onward journey.' }
+    ],
+    anini: [
+      { day: 1, name: 'Guwahati (Pickup)', lat: 26.1445, lng: 91.7362, note: 'Start point.' },
+      { day: 1, name: 'Roing', lat: 28.1409, lng: 95.8394, note: 'Gateway to Dibang Valley.' },
+      { day: 2, name: 'Anini', lat: 28.8167, lng: 95.9333, note: 'River crossings, forest tracks, waterfalls en route.' },
+      { day: 3, name: 'Anini & Dibang Valley', lat: 28.8167, lng: 95.9333, note: 'Local trails and river valley walks.' },
+      { day: 4, name: 'Mehao Wildlife Sanctuary', lat: 28.1897, lng: 95.8536, note: 'Mehao Lake — birdwatching and forest walks.' },
+      { day: 5, name: 'Roing (Return)', lat: 28.1409, lng: 95.8394, note: 'Overnight before the final leg.' },
+      { day: 6, name: 'Guwahati (Drop)', lat: 26.1445, lng: 91.7362, note: 'Trip ends.' }
+    ],
+    dong: [
+      { day: 1, name: 'Guwahati (Pickup)', lat: 26.1445, lng: 91.7362, note: 'Start point.' },
+      { day: 1, name: 'Tezu', lat: 27.9167, lng: 96.1667, note: 'Base for the Dong Valley route.' },
+      { day: 2, name: 'Walong', lat: 28.15, lng: 97.0167, note: 'Scenic border town along the Lohit river.' },
+      { day: 3, name: 'Dong Valley', lat: 27.9333, lng: 97.4667, note: 'Final stretch to the village.' },
+      { day: 4, name: 'Dong Sunrise Point', lat: 27.9333, lng: 97.4667, note: "India's first sunrise, before returning to Walong." },
+      { day: 5, name: 'Guwahati (Return)', lat: 26.1445, lng: 91.7362, note: 'Long drive back via Tezu.' }
+    ]
+  };
 
-const PaymentTransactionSchema = new mongoose.Schema({
-  id: { type: Number, unique: true },
-  method: { type: String, required: true }, // 'razorpay' | 'upi_manual'
-  razorpay_order_id: String,
-  razorpay_payment_id: String,
-  amount: { type: Number, required: true }, // in INR (rupees, not paise)
-  name: String,
-  phone: String,
-  note: String,
-  status: { type: String, default: 'created' }, // created | paid | failed
-  created_at: { type: String, default: () => new Date().toISOString() }
-});
+  const updateStops = db.prepare(`UPDATE packages SET route_stops = ? WHERE slug = ? AND (route_stops IS NULL OR route_stops = '[]')`);
+  Object.entries(backfill).forEach(([slug, stops]) => {
+    updateStops.run(JSON.stringify(stops), slug);
+  });
+})();
 
-const BlogPostSchema = new mongoose.Schema({
-  id: { type: Number, unique: true },
-  slug: { type: String, unique: true, required: true },
-  title: { type: String, required: true },
-  excerpt: String,
-  content: { type: String, default: '' }, // simple markdown-lite — see parseMarkdownLite()
-  cover_image: String,
-  tags: { type: Array, default: [] },
-  meta_description: String,
-  status: { type: String, default: 'draft' }, // draft | published
-  published_at: String,
-  created_at: { type: String, default: () => new Date().toISOString() },
-  updated_at: { type: String, default: () => new Date().toISOString() }
-});
+// ─── Seed ─────────────────────────────────────────────────────────────────────
 
-const AdminUser = mongoose.model('AdminUser', AdminUserSchema);
-const Package = mongoose.model('Package', PackageSchema);
-const Rental = mongoose.model('Rental', RentalSchema);
-const Gallery = mongoose.model('Gallery', GallerySchema);
-const Testimonial = mongoose.model('Testimonial', TestimonialSchema);
-const Setting = mongoose.model('Setting', SettingSchema);
-const Booking = mongoose.model('Booking', BookingSchema);
-const AvailabilityBlock = mongoose.model('AvailabilityBlock', AvailabilityBlockSchema);
-const Enquiry = mongoose.model('Enquiry', EnquirySchema);
-const PaymentTransaction = mongoose.model('PaymentTransaction', PaymentTransactionSchema);
-const BlogPost = mongoose.model('BlogPost', BlogPostSchema);
-
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
-// Mongoose documents carry a lot of internal machinery (_id, __v, etc) that
-// the front end doesn't expect. Strip down to a plain object shaped like the
-// old SQLite rows.
-function plain(doc) {
-  if (!doc) return null;
-  const o = doc.toObject ? doc.toObject() : doc;
-  delete o._id;
-  delete o.__v;
-  return o;
-}
-function plainAll(docs) { return docs.map(plain); }
-
-// The admin form sends itinerary/inclusions/exclusions/highlights/route_stops/
-// tags as JSON-stringified text (same as it always did for the old SQLite
-// text columns) — parse them into real arrays before storing as native Mongo
-// arrays. Already-array input (e.g. from internal callers) passes through.
-function parseArrayField(val) {
-  if (Array.isArray(val)) return val;
-  if (typeof val === 'string') {
-    try { return JSON.parse(val); } catch { return []; }
-  }
-  return [];
-}
-
-// ─── Seed ───────────────────────────────────────────────────────────────────
-
-async function seed() {
-  const hasAdmin = await AdminUser.findOne({ username: process.env.ADMIN_USERNAME || 'admin' });
+function seed() {
+  const hasAdmin = db.prepare('SELECT id FROM admin_users WHERE username = ?').get('admin');
   if (!hasAdmin) {
-    const username = process.env.ADMIN_USERNAME || 'admin';
-    const password = process.env.ADMIN_PASSWORD || 'admin123';
-    const hash = bcrypt.hashSync(password, 10);
-    await AdminUser.create({ id: await nextId('admin_users'), username, password_hash: hash });
+    const hash = bcrypt.hashSync('admin123', 10);
+    db.prepare('INSERT INTO admin_users (username, password_hash) VALUES (?, ?)').run('admin', hash);
   }
 
-  const pkgCount = await Package.countDocuments();
+  const pkgCount = db.prepare('SELECT COUNT(*) as c FROM packages').get().c;
   if (pkgCount === 0) {
+    const insertPkg = db.prepare(`
+      INSERT INTO packages (slug, name, route, duration, group_size, vehicle, price, image_path, description, itinerary, inclusions, exclusions, highlights, route_stops, featured, display_order)
+      VALUES (@slug, @name, @route, @duration, @group_size, @vehicle, @price, @image_path, @description, @itinerary, @inclusions, @exclusions, @highlights, @route_stops, @featured, @display_order)
+    `);
+
     const packages = [
       {
-        slug: 'meghalaya', name: 'Meghalaya Explorer', route: 'Shillong · Dawki · Cherrapunji',
-        duration: '3D / 2N', group_size: '2–10 people', vehicle: 'SUV', price: null,
+        slug: 'meghalaya',
+        name: 'Meghalaya Explorer',
+        route: 'Shillong · Dawki · Cherrapunji',
+        duration: '3D / 2N',
+        group_size: '2–10 people',
+        vehicle: 'Innova',
+        price: null,
         image_path: 'assets/destinations/meghalaya.jpg',
         description: "A compact loop through Meghalaya's best-known stops — waterfalls, the living root bridges around Cherrapunji, and the clear waters of Dawki.",
-        itinerary: [
+        itinerary: JSON.stringify([
           { day: 1, title: 'Arrive Shillong', content: 'Pickup from Guwahati airport, drive to Shillong, evening at Police Bazar and Ward\'s Lake.' },
           { day: 2, title: 'Cherrapunji', content: 'Nohkalikai Falls, Mawsmai Cave, and a walk toward the living root bridges.' },
           { day: 3, title: 'Dawki & Return', content: 'Boat ride on the Umngot river at Dawki, then drive back toward Guwahati.' }
-        ],
-        inclusions: ['Vehicle & experienced driver', 'Airport / station pickup & drop', 'Point-to-point transfers on the route', 'Trip planning & local guidance'],
-        exclusions: ['Hotels & accommodation', 'Entry permits & fees', 'Meals & personal expenses'],
-        highlights: ['Dawki river boat ride', 'Nohkalikai Falls', 'Living root bridges', 'Mawsmai Cave'],
-        route_stops: [
+        ]),
+        inclusions: JSON.stringify(['Vehicle & experienced driver', 'Airport / station pickup & drop', 'Point-to-point transfers on the route', 'Trip planning & local guidance']),
+        exclusions: JSON.stringify(['Hotels & accommodation', 'Entry permits & fees', 'Meals & personal expenses']),
+        highlights: JSON.stringify(['Dawki river boat ride', 'Nohkalikai Falls', 'Living root bridges', 'Mawsmai Cave']),
+        route_stops: JSON.stringify([
           { day: 1, name: 'Guwahati (Pickup)', lat: 26.1445, lng: 91.7362, note: 'Airport / railway station pickup.' },
           { day: 1, name: 'Shillong', lat: 25.5788, lng: 91.8933, note: "Police Bazar & Ward's Lake." },
           { day: 2, name: 'Cherrapunji', lat: 25.2702, lng: 91.7323, note: 'Nohkalikai Falls, Mawsmai Cave, living root bridges.' },
           { day: 3, name: 'Dawki', lat: 25.1966, lng: 92.0202, note: 'Boat ride on the Umngot river, then return.' }
-        ],
-        featured: 1, display_order: 1
+        ]),
+        featured: 1,
+        display_order: 1
       },
       {
-        slug: 'bhutan', name: 'Bhutan Escape', route: 'Paro · Thimphu · Punakha',
-        duration: '5 Days', group_size: 'Small groups', vehicle: 'SUV', price: null,
+        slug: 'bhutan',
+        name: 'Bhutan Escape',
+        route: 'Paro · Thimphu · Punakha',
+        duration: '5 Days',
+        group_size: 'Small groups',
+        vehicle: 'Innova',
+        price: null,
         image_path: 'assets/destinations/bhutan.jpg',
         description: "A guided journey through Bhutan's western valley towns — Tiger's Nest monastery, Punakha Dzong, and the forested road between Thimphu and Paro.",
-        itinerary: [
+        itinerary: JSON.stringify([
           { day: 1, title: 'Arrive Paro', content: 'Arrival at Paro airport, transfer to Thimphu. Evening walk around the capital.' },
           { day: 2, title: 'Thimphu Sightseeing', content: 'Buddha Dordenma statue, Folk Heritage Museum, Tashichho Dzong.' },
           { day: 3, title: 'Punakha Valley', content: 'Drive to Punakha. Punakha Dzong, Chimi Lhakhang fertility temple.' },
           { day: 4, title: "Tiger's Nest Trek", content: "The classic hike to Paro Taktsang (Tiger's Nest). Afternoon at leisure in Paro town." },
           { day: 5, title: 'Departure', content: 'Transfer to Paro airport for departure.' }
-        ],
-        inclusions: ['Vehicle & experienced driver', 'Bhutan permit assistance', 'Airport transfers', 'Point-to-point transfers'],
-        exclusions: ['Bhutan visa/permit fees', 'Hotels & accommodation', 'Meals', 'Airfare'],
-        highlights: ["Tiger's Nest Monastery", 'Punakha Dzong', 'Thimphu sightseeing', 'Forested mountain roads'],
-        route_stops: [
+        ]),
+        inclusions: JSON.stringify(['Vehicle & experienced driver', 'Bhutan permit assistance', 'Airport transfers', 'Point-to-point transfers']),
+        exclusions: JSON.stringify(['Bhutan visa/permit fees', 'Hotels & accommodation', 'Meals', 'Airfare']),
+        highlights: JSON.stringify(["Tiger's Nest Monastery", 'Punakha Dzong', 'Thimphu sightseeing', 'Forested mountain roads']),
+        route_stops: JSON.stringify([
           { day: 1, name: 'Paro (Arrival)', lat: 27.4287, lng: 89.4164, note: 'Arrival at Paro airport, transfer onward.' },
           { day: 1, name: 'Thimphu', lat: 27.4712, lng: 89.6339, note: 'Evening walk around the capital.' },
           { day: 2, name: 'Thimphu Sightseeing', lat: 27.4712, lng: 89.6339, note: 'Buddha Dordenma, Folk Heritage Museum, Tashichho Dzong.' },
           { day: 3, name: 'Punakha', lat: 27.5921, lng: 89.8797, note: 'Punakha Dzong, Chimi Lhakhang fertility temple.' },
           { day: 4, name: "Paro Taktsang (Tiger's Nest)", lat: 27.4915, lng: 89.3637, note: 'The classic cliffside monastery hike.' },
           { day: 5, name: 'Paro (Departure)', lat: 27.4287, lng: 89.4164, note: 'Transfer to Paro airport for departure.' }
-        ],
-        featured: 1, display_order: 2
+        ]),
+        featured: 1,
+        display_order: 2
       },
       {
-        slug: 'sikkim', name: 'Sikkim Getaway', route: 'Gangtok · Tsomgo Lake · Monasteries',
-        duration: '4 Days', group_size: '2–8 people', vehicle: 'SUV', price: null,
+        slug: 'sikkim',
+        name: 'Sikkim Getaway',
+        route: 'Gangtok · Tsomgo Lake · Monasteries',
+        duration: '4 Days',
+        group_size: '2–8 people',
+        vehicle: 'Scorpio',
+        price: null,
         image_path: 'assets/destinations/sikkim.jpg',
         description: "High-altitude Sikkim — Gangtok's monastery circuit, Tsomgo lake and Nathula pass (if open), and the Rumtek monastery.",
-        itinerary: [
+        itinerary: JSON.stringify([
           { day: 1, title: 'Arrive Gangtok', content: 'Arrive from NJP / Bagdogra, transfer to Gangtok. MG Marg evening walk.' },
           { day: 2, title: 'Tsomgo Lake & Nathula', content: 'Early drive to Tsomgo Lake (3753m). Nathula Pass visit subject to permit availability.' },
           { day: 3, title: 'Monastery Circuit', content: 'Rumtek Monastery, Enchey Monastery, Do-Drul Chorten stupa.' },
           { day: 4, title: 'Return', content: 'Drive back to NJP / Bagdogra for onward journey.' }
-        ],
-        inclusions: ['Vehicle & experienced driver', 'Nathula permit assistance', 'Transfers throughout', 'Local guidance'],
-        exclusions: ['Permits (Nathula, protected area)', 'Hotels & accommodation', 'Meals'],
-        highlights: ['Tsomgo Lake at 3753m', 'Nathula Pass', 'Rumtek Monastery', 'Gangtok MG Marg'],
-        route_stops: [
+        ]),
+        inclusions: JSON.stringify(['Vehicle & experienced driver', 'Nathula permit assistance', 'Transfers throughout', 'Local guidance']),
+        exclusions: JSON.stringify(['Permits (Nathula, protected area)', 'Hotels & accommodation', 'Meals']),
+        highlights: JSON.stringify(['Tsomgo Lake at 3753m', 'Nathula Pass', 'Rumtek Monastery', 'Gangtok MG Marg']),
+        route_stops: JSON.stringify([
           { day: 1, name: 'NJP / Bagdogra (Pickup)', lat: 26.7271, lng: 88.3953, note: 'Arrival transfer up to Gangtok.' },
           { day: 1, name: 'Gangtok', lat: 27.3389, lng: 88.6065, note: 'MG Marg evening walk.' },
           { day: 2, name: 'Tsomgo Lake & Nathula', lat: 27.3747, lng: 88.7601, note: 'Glacial lake; Nathula Pass subject to permits.' },
           { day: 3, name: 'Rumtek Monastery', lat: 27.2836, lng: 88.5614, note: 'Rumtek, Enchey Monastery, Do-Drul Chorten.' },
           { day: 4, name: 'NJP / Bagdogra (Departure)', lat: 26.7271, lng: 88.3953, note: 'Drive back for onward journey.' }
-        ],
-        featured: 1, display_order: 3
+        ]),
+        featured: 1,
+        display_order: 3
       },
       {
-        slug: 'anini', name: 'Anini Expedition', route: 'Dibang Valley · Arunachal Pradesh',
-        duration: '6 Days', group_size: 'Small groups', vehicle: 'SUV', price: null,
+        slug: 'anini',
+        name: 'Anini Expedition',
+        route: 'Dibang Valley · Arunachal Pradesh',
+        duration: '6 Days',
+        group_size: 'Small groups',
+        vehicle: 'Scorpio',
+        price: null,
         image_path: 'assets/destinations/anini.jpg',
         description: "One of India's most remote districts — the Dibang Valley road to Anini takes you through pristine forests, river valleys, and Adi tribal villages.",
-        itinerary: [
+        itinerary: JSON.stringify([
           { day: 1, title: 'Guwahati to Roing', content: 'Long drive to Roing, the gateway to Dibang Valley. Overnight at Roing.' },
           { day: 2, title: 'Roing to Anini', content: 'Early start. The road to Anini — river crossings, forest tracks, waterfalls.' },
           { day: 3, title: 'Anini & Dibang Valley', content: 'Explore Anini town and surrounding trails. Dibang river valley walks.' },
           { day: 4, title: 'Mehao Wildlife Sanctuary', content: 'Drive toward Mehao Lake. Birdwatching and forest walks.' },
           { day: 5, title: 'Return to Roing', content: 'Drive back. Overnight at Roing.' },
           { day: 6, title: 'Roing to Guwahati', content: 'Return drive to Guwahati.' }
-        ],
-        inclusions: ['4WD vehicle & driver', 'ILP (Inner Line Permit) assistance', 'Transfers throughout', 'Local route planning'],
-        exclusions: ['ILP fees', 'Hotels & accommodation', 'Meals', 'Personal expenses'],
-        highlights: ['Dibang river valley', 'Mehao Wildlife Sanctuary', 'Anini — one of India\'s most remote towns', 'Adi tribal culture'],
-        route_stops: [
+        ]),
+        inclusions: JSON.stringify(['4WD vehicle & driver', 'ILP (Inner Line Permit) assistance', 'Transfers throughout', 'Local route planning']),
+        exclusions: JSON.stringify(['ILP fees', 'Hotels & accommodation', 'Meals', 'Personal expenses']),
+        highlights: JSON.stringify(['Dibang river valley', 'Mehao Wildlife Sanctuary', 'Anini — one of India\'s most remote towns', 'Adi tribal culture']),
+        route_stops: JSON.stringify([
           { day: 1, name: 'Guwahati (Pickup)', lat: 26.1445, lng: 91.7362, note: 'Start point.' },
           { day: 1, name: 'Roing', lat: 28.1409, lng: 95.8394, note: 'Gateway to Dibang Valley.' },
           { day: 2, name: 'Anini', lat: 28.8167, lng: 95.9333, note: 'River crossings, forest tracks, waterfalls en route.' },
@@ -326,73 +313,90 @@ async function seed() {
           { day: 4, name: 'Mehao Wildlife Sanctuary', lat: 28.1897, lng: 95.8536, note: 'Mehao Lake — birdwatching and forest walks.' },
           { day: 5, name: 'Roing (Return)', lat: 28.1409, lng: 95.8394, note: 'Overnight before the final leg.' },
           { day: 6, name: 'Guwahati (Drop)', lat: 26.1445, lng: 91.7362, note: 'Trip ends.' }
-        ],
-        featured: 1, display_order: 4
+        ]),
+        featured: 1,
+        display_order: 4
       },
       {
-        slug: 'dong', name: 'Dong Valley Sunrise', route: 'Dong Valley · Arunachal Pradesh',
-        duration: '5 Days', group_size: 'Small groups', vehicle: 'SUV', price: null,
+        slug: 'dong',
+        name: 'Dong Valley Sunrise',
+        route: 'Dong Valley · Arunachal Pradesh',
+        duration: '5 Days',
+        group_size: 'Small groups',
+        vehicle: 'Scorpio',
+        price: null,
         image_path: 'assets/destinations/dong.jpg',
         description: "Dong village in Anjaw district is the easternmost point of India — famous for being the first place in the country to see the sunrise. A truly off-the-beaten-path expedition.",
-        itinerary: [
+        itinerary: JSON.stringify([
           { day: 1, title: 'Guwahati to Tezu', content: 'Drive to Tezu, the base for the Dong Valley route. Overnight.' },
           { day: 2, title: 'Tezu to Walong', content: 'Drive along the Lohit river to Walong, a scenic border town.' },
           { day: 3, title: 'Walong to Dong', content: 'The final stretch to Dong village. Pre-dawn preparation for the next morning.' },
           { day: 4, title: 'Sunrise at Dong', content: 'Wake before dawn to witness India\'s first sunrise. Return to Walong.' },
           { day: 5, title: 'Return to Guwahati', content: 'Long drive back to Guwahati via Tezu.' }
-        ],
-        inclusions: ['4WD vehicle & driver', 'ILP permit assistance', 'Transfers', 'Route planning'],
-        exclusions: ['ILP fees', 'Hotels', 'Meals', 'Personal expenses'],
-        highlights: ['Easternmost point of India', 'First sunrise in India', 'Lohit river valley', 'Walong war memorial'],
-        route_stops: [
+        ]),
+        inclusions: JSON.stringify(['4WD vehicle & driver', 'ILP permit assistance', 'Transfers', 'Route planning']),
+        exclusions: JSON.stringify(['ILP fees', 'Hotels', 'Meals', 'Personal expenses']),
+        highlights: JSON.stringify(['Easternmost point of India', 'First sunrise in India', 'Lohit river valley', 'Walong war memorial']),
+        route_stops: JSON.stringify([
           { day: 1, name: 'Guwahati (Pickup)', lat: 26.1445, lng: 91.7362, note: 'Start point.' },
           { day: 1, name: 'Tezu', lat: 27.9167, lng: 96.1667, note: 'Base for the Dong Valley route.' },
           { day: 2, name: 'Walong', lat: 28.15, lng: 97.0167, note: 'Scenic border town along the Lohit river.' },
           { day: 3, name: 'Dong Valley', lat: 27.9333, lng: 97.4667, note: 'Final stretch to the village.' },
           { day: 4, name: 'Dong Sunrise Point', lat: 27.9333, lng: 97.4667, note: "India's first sunrise, before returning to Walong." },
           { day: 5, name: 'Guwahati (Return)', lat: 26.1445, lng: 91.7362, note: 'Long drive back via Tezu.' }
-        ],
-        featured: 1, display_order: 5
+        ]),
+        featured: 1,
+        display_order: 5
       },
       {
-        slug: 'ziro-fest', name: 'Ziro Fest', route: 'Guwahati ↔ Ziro Valley',
-        duration: '3 Days / 2 Nights', group_size: 'Limited seats', vehicle: 'SUV',
+        slug: 'ziro-fest',
+        name: 'Ziro Fest',
+        route: 'Guwahati ↔ Ziro Valley',
+        duration: '3 Days / 2 Nights',
+        group_size: 'Limited seats',
+        vehicle: 'SUV',
         price: '₹9,599/- onwards, per person',
         image_path: 'assets/destinations/ziro-fest.jpg',
         description: "Three days of live music under the stars in Ziro Valley — SUV transport from Guwahati, a campsite stay, and full days at one of Northeast India's best-loved outdoor music festivals. Fixed departure: 24–26 Sept 2026, seats limited.",
-        itinerary: [
+        itinerary: JSON.stringify([
           { day: 1, title: 'Guwahati to Ziro', content: 'Early departure by SUV, scenic drive through Assam into the Arunachal foothills. Arrive at the festival campsite by evening and settle in.' },
           { day: 2, title: 'Ziro Fest — Full Day', content: 'A full day and night at the festival grounds — live music across genres, food stalls, and the Ziro Valley countryside by daylight.' },
           { day: 3, title: 'Return to Guwahati', content: 'Pack up camp in the morning and begin the drive back, with drop-off in Guwahati by evening.' }
-        ],
-        inclusions: ['SUV transportation (Guwahati ↔ Ziro ↔ Guwahati)', 'Inner Line Permit (ILP)', '2 nights campsite stay', 'Breakfast', 'Fuel & toll charges', 'Driver allowance'],
-        exclusions: ['Ziro Fest entry pass (purchased separately)', 'Lunch & dinner', 'Personal expenses', 'Travel insurance'],
-        highlights: ['Camp under the stars', 'Live music across 3 days', 'Fixed departure — 24–26 Sept 2026', "Ziro Valley's Apatani countryside"],
-        route_stops: [
+        ]),
+        inclusions: JSON.stringify(['SUV transportation (Guwahati ↔ Ziro ↔ Guwahati)', 'Inner Line Permit (ILP)', '2 nights campsite stay', 'Breakfast', 'Fuel & toll charges', 'Driver allowance']),
+        exclusions: JSON.stringify(['Ziro Fest entry pass (purchased separately)', 'Lunch & dinner', 'Personal expenses', 'Travel insurance']),
+        highlights: JSON.stringify(['Camp under the stars', 'Live music across 3 days', 'Fixed departure — 24–26 Sept 2026', "Ziro Valley's Apatani countryside"]),
+        route_stops: JSON.stringify([
           { day: 1, name: 'Guwahati (Pickup)', lat: 26.1445, lng: 91.7362, note: 'SUV departs for Ziro Valley.' },
           { day: 1, name: 'Ziro Valley (Campsite)', lat: 27.6, lng: 93.83, note: 'Arrive at the festival campsite, settle in for the night.' },
           { day: 2, name: 'Ziro Fest Grounds', lat: 27.6, lng: 93.83, note: 'Full day and night of live music.' },
           { day: 3, name: 'Guwahati (Return)', lat: 26.1445, lng: 91.7362, note: 'Drive back, drop-off in the evening.' }
-        ],
-        featured: 1, display_order: 6
+        ]),
+        featured: 1,
+        display_order: 6
       },
       {
-        slug: 'kaho', name: "Kaho — India's First Village", route: 'Tezu · Hawai · Kibithu · Kaho',
-        duration: '6 Days', group_size: 'Small groups', vehicle: 'SUV', price: null,
+        slug: 'kaho',
+        name: "Kaho — India's First Village",
+        route: 'Tezu · Hawai · Kibithu · Kaho',
+        duration: '6 Days',
+        group_size: 'Small groups',
+        vehicle: 'Scorpio',
+        price: null,
         image_path: 'assets/destinations/kaho.jpg',
         description: "Kaho, on the India-China border in Anjaw district, is the easternmost inhabited village in the country — reached via a long, spectacular drive along the Lohit river through Tezu, Hawai and Kibithu. One of the most remote expeditions we run.",
-        itinerary: [
+        itinerary: JSON.stringify([
           { day: 1, title: 'Guwahati to Tezu', content: 'Long drive day toward Tezu, the last major town before the border road begins. Overnight in Tezu.' },
           { day: 2, title: 'Tezu to Hawai', content: 'Winding mountain roads along the Lohit river to Hawai, the district headquarters of Anjaw.' },
           { day: 3, title: 'Hawai to Kibithu', content: "Continue deeper along the border road to Kibithu, one of India's easternmost army posts." },
           { day: 4, title: 'Kibithu to Kaho', content: 'Final stretch to Kaho village on the Lohit river, with Chinese infrastructure visible across the border. Explore the village and checkpost area.' },
           { day: 5, title: 'Return to Hawai', content: 'Begin the long drive back toward Tezu.' },
           { day: 6, title: 'Return to Guwahati', content: 'Final leg back to Guwahati.' }
-        ],
-        inclusions: ['4WD vehicle & driver', 'ILP (Inner Line Permit) assistance', 'Transfers throughout', "Route planning for one of India's most remote roads"],
-        exclusions: ['ILP fees', 'Hotels & homestays', 'Meals', 'Personal expenses'],
-        highlights: ["India's easternmost inhabited village", 'Views across the India-China border', 'Lohit river valley road', "Declared India's official 'first village' in 2022"],
-        route_stops: [
+        ]),
+        inclusions: JSON.stringify(['4WD vehicle & driver', 'ILP (Inner Line Permit) assistance', 'Transfers throughout', "Route planning for one of India's most remote roads"]),
+        exclusions: JSON.stringify(['ILP fees', 'Hotels & homestays', 'Meals', 'Personal expenses']),
+        highlights: JSON.stringify(["India's easternmost inhabited village", 'Views across the India-China border', 'Lohit river valley road', "Declared India's official 'first village' in 2022"]),
+        route_stops: JSON.stringify([
           { day: 1, name: 'Guwahati (Pickup)', lat: 26.1445, lng: 91.7362, note: 'Start point.' },
           { day: 1, name: 'Tezu', lat: 27.9167, lng: 96.1667, note: 'Last major town before the border road.' },
           { day: 2, name: 'Hawai', lat: 27.88528, lng: 96.81028, note: 'District headquarters of Anjaw.' },
@@ -400,32 +404,36 @@ async function seed() {
           { day: 4, name: 'Kaho', lat: 28.30361, lng: 97.02222, note: 'Easternmost inhabited village — China visible across the river.' },
           { day: 5, name: 'Hawai (Return)', lat: 27.88528, lng: 96.81028, note: 'Beginning the return journey.' },
           { day: 6, name: 'Guwahati (Drop)', lat: 26.1445, lng: 91.7362, note: 'Trip ends.' }
-        ],
-        featured: 1, display_order: 7
+        ]),
+        featured: 1,
+        display_order: 7
       }
     ];
 
-    for (const p of packages) {
-      await Package.create({ ...p, id: await nextId('packages') });
-    }
+    packages.forEach(p => insertPkg.run(p));
   }
 
-  const rentalCount = await Rental.countDocuments();
+  const rentalCount = db.prepare('SELECT COUNT(*) as c FROM rentals').get().c;
   if (rentalCount === 0) {
-    const rentals = [
-      { name: 'Toyota Innova Crysta', seats: '7', tags: [{ icon: 'fa-users', label: '7 seats' }, { icon: 'fa-gas-pump', label: 'Diesel' }], image_path: 'assets/rentals/innova.jpg', whatsapp: '919707386186', display_order: 1 },
-      { name: 'Maruti Ertiga', seats: '7', tags: [{ icon: 'fa-users', label: '7 seats' }, { icon: 'fa-snowflake', label: 'AC' }], image_path: 'assets/rentals/ertiga.jpg', whatsapp: '919707386186', display_order: 2 },
-      { name: 'Mahindra Scorpio', seats: '7', tags: [{ icon: 'fa-mountain', label: 'SUV' }, { icon: 'fa-road', label: 'Mountain-ready' }], image_path: 'assets/rentals/scorpio.jpg', whatsapp: '919707386186', display_order: 3 },
-      { name: 'Swift Dzire', seats: '5', tags: [{ icon: 'fa-car', label: 'Sedan' }, { icon: 'fa-plane', label: 'Airport pickup' }], image_path: 'assets/rentals/dzire.jpg', whatsapp: '919707386186', display_order: 4 }
-    ];
-    for (const r of rentals) {
-      await Rental.create({ ...r, id: await nextId('rentals') });
-    }
+    const insertRental = db.prepare(`
+      INSERT INTO rentals (name, seats, tags, image_path, whatsapp, display_order)
+      VALUES (@name, @seats, @tags, @image_path, @whatsapp, @display_order)
+    `);
+    [
+      { name: 'Toyota Innova Crysta', seats: '7', tags: JSON.stringify([{ icon: 'fa-users', label: '7 seats' }, { icon: 'fa-gas-pump', label: 'Diesel' }]), image_path: 'assets/rentals/innova.jpg', whatsapp: '919707386186', display_order: 1 },
+      { name: 'Maruti Ertiga', seats: '7', tags: JSON.stringify([{ icon: 'fa-users', label: '7 seats' }, { icon: 'fa-snowflake', label: 'AC' }]), image_path: 'assets/rentals/ertiga.jpg', whatsapp: '919707386186', display_order: 2 },
+      { name: 'Mahindra Scorpio', seats: '7', tags: JSON.stringify([{ icon: 'fa-mountain', label: 'SUV' }, { icon: 'fa-road', label: 'Mountain-ready' }]), image_path: 'assets/rentals/scorpio.jpg', whatsapp: '919707386186', display_order: 3 },
+      { name: 'Swift Dzire', seats: '5', tags: JSON.stringify([{ icon: 'fa-car', label: 'Sedan' }, { icon: 'fa-plane', label: 'Airport pickup' }]), image_path: 'assets/rentals/dzire.jpg', whatsapp: '919707386186', display_order: 4 }
+    ].forEach(r => insertRental.run(r));
   }
 
-  const galCount = await Gallery.countDocuments();
+  const galCount = db.prepare('SELECT COUNT(*) as c FROM gallery').get().c;
   if (galCount === 0) {
-    const gallery = [
+    const insertGal = db.prepare(`
+      INSERT INTO gallery (image_path, alt_text, is_tall, display_order)
+      VALUES (@image_path, @alt_text, @is_tall, @display_order)
+    `);
+    [
       { image_path: 'assets/gallery/11.jpg', alt_text: 'Northeast India travel moment', is_tall: 1, display_order: 1 },
       { image_path: 'assets/gallery/7.jpg', alt_text: 'Northeast India travel moment', is_tall: 0, display_order: 2 },
       { image_path: 'assets/gallery/8.jpg', alt_text: 'Northeast India travel moment', is_tall: 0, display_order: 3 },
@@ -440,417 +448,204 @@ async function seed() {
       { image_path: 'assets/gallery/5.jpg', alt_text: 'Northeast India travel moment', is_tall: 0, display_order: 12 },
       { image_path: 'assets/gallery/6.jpg', alt_text: 'Northeast India travel moment', is_tall: 0, display_order: 13 },
       { image_path: 'assets/gallery/14.jpg', alt_text: 'Northeast India travel moment', is_tall: 0, display_order: 14 }
-    ];
-    for (const g of gallery) {
-      await Gallery.create({ ...g, id: await nextId('gallery') });
-    }
+    ].forEach(g => insertGal.run(g));
   }
 
-  // Testimonials are intentionally NOT seeded with placeholder data — see the
-  // original SQLite version's note. They only enter via a real visitor
-  // submission or a manual admin entry.
+  // Note: testimonials are intentionally NOT seeded with placeholder data.
+  // Reviews only ever enter the table through a genuine visitor submission
+  // (POST /api/testimonials/submit) or a manual admin entry, and stay in
+  // "pending" status until an admin approves them for the public site.
 
-  const blogCount = await BlogPost.countDocuments();
-  if (blogCount === 0) {
-    const now = new Date().toISOString();
-    const posts = [
-      {
-        slug: 'ilp-permit-guide-northeast-india',
-        title: 'ILP Permit Guide: Arunachal Pradesh, Nagaland & Mizoram',
-        excerpt: "Everything you need to know about the Inner Line Permit and Protected Area Permit before you travel to Northeast India's restricted zones.",
-        meta_description: 'A complete guide to the Inner Line Permit (ILP) for Arunachal Pradesh, Nagaland, and Mizoram, plus Protected Area Permits for foreign nationals — what you need, how to get it, and how long it takes.',
-        tags: ['Permits', 'Planning', 'Arunachal Pradesh'],
-        cover_image: 'assets/destinations/dong.jpg',
-        status: 'published',
-        published_at: now,
-        content: `## What is the Inner Line Permit?
-
-The Inner Line Permit (ILP) is a travel document Indian citizens need to enter Arunachal Pradesh, Nagaland, and Mizoram. It exists to regulate movement into border-sensitive and protected tribal areas — it isn't a visa, but it's just as mandatory. Foreign nationals need a different document instead: a Protected Area Permit (PAP), which has its own set of rules.
-
-## Who actually needs one
-
-- **Indian citizens** travelling to Arunachal Pradesh, Nagaland, or Mizoram need an ILP.
-- **Foreign nationals** need a Protected Area Permit (PAP) for all three states, and for parts of Sikkim near the China border.
-- Residents of the state you're visiting, and a few other exempted categories, don't need a permit — but always confirm current rules before you travel, since these change.
-
-## How long it takes
-
-For most routes we run, ILP processing takes anywhere from a same-day turnaround up to a few working days, depending on the entry point and the specific district. Remote-route trips — Anini, Kaho, Dong Valley — sit at the longer end of that range because they involve additional district-level clearances beyond the basic ILP.
-
-## What we handle for you
-
-On every package that requires a permit, we take care of the paperwork as part of planning your trip — you'll need to send us clear photos of your ID and a passport-size photo, and we handle the rest. That said, permit issuance is ultimately at the discretion of the relevant government authority, so we'd always recommend booking with enough lead time, especially for remote routes.
-
-## Practical tips
-
-- Carry physical copies of your ID and the permit itself — don't rely on a phone screenshot at checkpoints.
-- Build in a buffer day if you're travelling during a festival period (Ziro Fest, Losar, Hornbill Festival) — processing can slow down when permit offices are busier than usual.
-- If you're combining multiple restricted states in one trip (say, Arunachal Pradesh into Nagaland), you'll need a separate permit for each.
-
-If you're planning a trip into any of these regions, [get in touch](/index.html#contact) and we'll walk you through exactly what's needed for your specific route.`
-      },
-      {
-        slug: 'best-time-to-visit-meghalaya',
-        title: 'Best Time to Visit Meghalaya: A Season-by-Season Guide',
-        excerpt: 'When to see the living root bridges at their best, when Cherrapunji actually lives up to its rainfall reputation, and when the roads are easiest to drive.',
-        meta_description: 'A season-by-season guide to visiting Meghalaya — when to see the living root bridges, Dawki river, and Cherrapunji waterfalls at their best, and what the monsoon actually means for your trip.',
-        tags: ['Meghalaya', 'Planning', 'Best Time to Visit'],
-        cover_image: 'assets/destinations/meghalaya.jpg',
-        status: 'published',
-        published_at: now,
-        content: `## The short answer
-
-October to April is the most reliable window for a first visit to Meghalaya — clear skies, comfortable temperatures, and dry roads. But the "best" time really depends on what you're going for, so here's the honest breakdown by season.
-
-## October to April — clear views, easy roads
-
-This is peak season for a reason. The monsoon has cleared out, mountain views open up properly, and the roads into Cherrapunji and Dawki are at their most predictable. Winter mornings (December–February) can be genuinely cold at altitude, so pack layers. This is also when Dawki's river is at its clearest — the "glass water" photos you've seen are almost always shot in this window.
-
-## June to September — the monsoon, and why it's not a dealbreaker
-
-Meghalaya means "abode of clouds," and Cherrapunji is one of the wettest inhabited places on Earth — the monsoon isn't a footnote here, it's the main event. Waterfalls are at their most dramatic, the landscape turns a genuinely different shade of green, and the living root bridges (which need consistent moisture to keep growing) look exactly as they're supposed to. The trade-off: some roads and river crossings become unpredictable day to day, and a few outdoor activities get called off on short notice. If you're flexible and want to see Meghalaya at its most alive, this season has real appeal — just don't lock in a tight schedule.
-
-## May and October — the shoulder months
-
-These two transition months are underrated. May sits just before the monsoon properly sets in — you get some of the greenery without the road unpredictability. October, right after the monsoon ends, is arguably the single best month: waterfalls are still full, the landscape hasn't dried out yet, and the clear-sky season is just beginning.
-
-## Our take
-
-If this is your first trip and you want reliability, aim for October–April. If you've been before, or you specifically want to see the region at its greenest and don't mind a looser itinerary, the monsoon months are worth it. Either way, [our Meghalaya packages](/packages.html) are built around the season you're travelling in, not a fixed template.`
-      },
-      {
-        slug: 'first-timers-guide-northeast-india-road-trip',
-        title: "A First-Timer's Guide to Planning a Northeast India Road Trip",
-        excerpt: "Northeast India isn't one destination — it's eight states with wildly different terrain, permit rules, and road conditions. Here's how to actually plan around that.",
-        meta_description: "A practical first-timer's guide to planning a Northeast India road trip — how to choose a region, what permits you'll need, how to pick a vehicle, and how much time to actually budget.",
-        tags: ['Planning', 'Road Trips', 'First-Timer Tips'],
-        cover_image: 'assets/destinations/anini.jpg',
-        status: 'published',
-        published_at: now,
-        content: `## Start with one region, not all of Northeast India
-
-The single biggest planning mistake first-timers make is trying to cover too much ground. "Northeast India" is eight states — Assam, Meghalaya, Sikkim, Arunachal Pradesh, Nagaland, Manipur, Mizoram, and Tripura — each with different terrain, permit requirements, and road quality. A realistic first trip picks one region and goes deep rather than skimming several.
-
-**Good first-trip combinations:**
-- Meghalaya alone (Shillong, Cherrapunji, Dawki) — the most accessible, no permit required for Indian nationals
-- Meghalaya + Sikkim as two separate legs
-- Sikkim alone, if high-altitude scenery is the priority
-
-**Save for a second trip:** Arunachal Pradesh's remote routes (Anini, Dong Valley, Kaho) — these reward people who already know what they're getting into.
-
-## Check permit requirements before you set dates
-
-If your route touches Arunachal Pradesh, Nagaland, Mizoram, or the border areas of Sikkim, you'll need a permit sorted before you travel — see our [full ILP permit guide](/blog-post.html?slug=ilp-permit-guide-northeast-india) for exactly what's required. This affects your timeline more than almost anything else, so check it first, before you book flights.
-
-## Picking a vehicle actually matters here
-
-Northeast India's mountain roads are a different category from a flat highway drive. For anything touching Meghalaya's plateau roads, Sikkim's mountain passes, or Arunachal Pradesh's more remote stretches, an SUV with a driver who knows the specific route beats a sedan and a GPS app every time — especially in monsoon season, when local knowledge of which river crossings are currently passable is genuinely the difference between a smooth day and a stuck one.
-
-## Budget more travel days than you think you need
-
-Mountain roads are slow by design — winding, single-lane in places, and weather-dependent. A route that looks like "3 hours" on a map can easily take 5–6. Build buffer days into any itinerary rather than a tight day-by-day schedule, particularly if you're combining multiple regions.
-
-## A rough first-timer timeline
-
-- **3–4 days:** enough for a focused Meghalaya loop
-- **5–6 days:** Sikkim's main circuit, or a slightly deeper Meghalaya trip
-- **7+ days:** combining two regions, or a proper remote Arunachal Pradesh route
-
-If you're not sure where to start, [tell us your dates and interests](/index.html#contact) and we'll help you figure out a realistic first route rather than an overly ambitious one.`
-      }
-    ];
-    for (const p of posts) {
-      await BlogPost.create({ ...p, id: await nextId('blog_posts'), created_at: now, updated_at: now });
-    }
-  }
-
-  const settingCount = await Setting.countDocuments();
+  const settingCount = db.prepare('SELECT COUNT(*) as c FROM settings').get().c;
   if (settingCount === 0) {
-    const settings = [
-      ['phone', '+91 97073 86186'],
+    const insertSetting = db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');
+    [
+      ['phone', '+91 60028 16370'],
       ['phone_raw', '+919707386186'],
       ['whatsapp', '919707386186'],
-      ['email', 'tourbuddiez@gmail.com'],
       ['instagram', 'touring_buddiez'],
       ['facebook', '#'],
       ['base_location', 'Guwahati, Assam'],
-      ['stat_destinations', '10'],
+      ['stat_destinations', '12'],
+      ['stat_travelers', '800'],
       ['stat_years', '2025'],
       ['stat_rating', '4.9'],
       ['site_description', 'Curated tours and reliable car rentals across Northeast India, based in Guwahati, Assam.'],
-      ['response_time', 'usually within the hour'],
-      ['upi_id', ''],
-      ['upi_payee_name', 'Touring Buddiez'],
-      ['payments_upi_enabled', 'false'],
-      ['payments_card_enabled', 'false'],
-      ['razorpay_key_id', ''],
-      ['razorpay_key_secret', '']
-    ];
-    for (const [key, value] of settings) {
-      await Setting.create({ key, value });
-    }
+      ['response_time', 'usually within the hour']
+    ].forEach(([k, v]) => insertSetting.run(k, v));
   }
 }
 
-mongoose.connection.once('open', () => {
-  seed()
-    .then(() => console.log('[db] Seed check complete'))
-    .catch((err) => console.error('[db] Seed error:', err.message));
-});
+seed();
 
-// ─── Query helpers ─────────────────────────────────────────────────────────
+// ─── Query helpers ─────────────────────────────────────────────────────────────
+
+function parseJSON(row) {
+  if (!row) return row;
+  ['itinerary', 'inclusions', 'exclusions', 'highlights', 'tags', 'route_stops'].forEach(field => {
+    if (row[field] && typeof row[field] === 'string') {
+      try { row[field] = JSON.parse(row[field]); } catch { row[field] = []; }
+    }
+  });
+  return row;
+}
 
 module.exports = {
   // Auth
-  getAdmin: (username) => AdminUser.findOne({ username }).then(plain),
-  updateAdminPassword: (id, hash) => AdminUser.updateOne({ id }, { password_hash: hash }),
+  getAdmin: (username) => db.prepare('SELECT * FROM admin_users WHERE username = ?').get(username),
+  updateAdminPassword: (id, hash) => db.prepare('UPDATE admin_users SET password_hash = ? WHERE id = ?').run(hash, id),
 
   // Packages
-  getAllPackages: () => Package.find().sort({ display_order: 1, id: 1 }).then(plainAll),
-  getFeaturedPackages: () => Package.find({ featured: 1 }).sort({ display_order: 1, id: 1 }).then(plainAll),
-  getPackageBySlug: (slug) => Package.findOne({ slug }).then(plain),
-  getPackageById: (id) => Package.findOne({ id }).then(plain),
-  createPackage: async (data) => {
-    const id = await nextId('packages');
-    await Package.create({
-      ...data, id,
-      itinerary: parseArrayField(data.itinerary),
-      inclusions: parseArrayField(data.inclusions),
-      exclusions: parseArrayField(data.exclusions),
-      highlights: parseArrayField(data.highlights),
-      route_stops: parseArrayField(data.route_stops),
-      gallery_images: parseArrayField(data.gallery_images)
-    });
-    return { lastInsertRowid: id };
+  getAllPackages: () => db.prepare('SELECT * FROM packages ORDER BY display_order, id').all().map(parseJSON),
+  getFeaturedPackages: () => db.prepare('SELECT * FROM packages WHERE featured = 1 ORDER BY display_order, id').all().map(parseJSON),
+  getPackageBySlug: (slug) => parseJSON(db.prepare('SELECT * FROM packages WHERE slug = ?').get(slug)),
+  getPackageById: (id) => parseJSON(db.prepare('SELECT * FROM packages WHERE id = ?').get(id)),
+  createPackage: (data) => {
+    const stmt = db.prepare(`
+      INSERT INTO packages (slug, name, route, duration, group_size, vehicle, price, image_path, description, itinerary, inclusions, exclusions, highlights, route_stops, featured, display_order)
+      VALUES (@slug, @name, @route, @duration, @group_size, @vehicle, @price, @image_path, @description, @itinerary, @inclusions, @exclusions, @highlights, @route_stops, @featured, @display_order)
+    `);
+    return stmt.run(data);
   },
-  updatePackage: (id, data) => Package.updateOne({ id }, {
-    ...data,
-    itinerary: parseArrayField(data.itinerary),
-    inclusions: parseArrayField(data.inclusions),
-    exclusions: parseArrayField(data.exclusions),
-    highlights: parseArrayField(data.highlights),
-    route_stops: parseArrayField(data.route_stops),
-    gallery_images: parseArrayField(data.gallery_images)
-  }),
-  deletePackage: (id) => Package.deleteOne({ id }),
+  updatePackage: (id, data) => {
+    const stmt = db.prepare(`
+      UPDATE packages SET slug=@slug, name=@name, route=@route, duration=@duration, group_size=@group_size,
+      vehicle=@vehicle, price=@price, image_path=@image_path, description=@description, itinerary=@itinerary,
+      inclusions=@inclusions, exclusions=@exclusions, highlights=@highlights, route_stops=@route_stops,
+      featured=@featured, display_order=@display_order WHERE id=@id
+    `);
+    return stmt.run({ ...data, id });
+  },
+  deletePackage: (id) => db.prepare('DELETE FROM packages WHERE id = ?').run(id),
 
   // Rentals
-  getAllRentals: () => Rental.find().sort({ display_order: 1, id: 1 }).then(plainAll),
-  getRentalById: (id) => Rental.findOne({ id }).then(plain),
-  createRental: async (data) => {
-    const id = await nextId('rentals');
-    return Rental.create({ ...data, id, tags: parseArrayField(data.tags) });
-  },
-  updateRental: (id, data) => Rental.updateOne({ id }, { ...data, tags: parseArrayField(data.tags) }),
-  deleteRental: (id) => Rental.deleteOne({ id }),
+  getAllRentals: () => db.prepare('SELECT * FROM rentals ORDER BY display_order, id').all().map(parseJSON),
+  getRentalById: (id) => parseJSON(db.prepare('SELECT * FROM rentals WHERE id = ?').get(id)),
+  createRental: (data) => db.prepare('INSERT INTO rentals (name, seats, tags, image_path, whatsapp, display_order) VALUES (@name, @seats, @tags, @image_path, @whatsapp, @display_order)').run(data),
+  updateRental: (id, data) => db.prepare('UPDATE rentals SET name=@name, seats=@seats, tags=@tags, image_path=@image_path, whatsapp=@whatsapp, display_order=@display_order WHERE id=@id').run({ ...data, id }),
+  deleteRental: (id) => db.prepare('DELETE FROM rentals WHERE id = ?').run(id),
 
   // Gallery
-  getAllGallery: () => Gallery.find().sort({ display_order: 1, id: 1 }).then(plainAll),
-  getGalleryById: (id) => Gallery.findOne({ id }).then(plain),
-  createGalleryItem: async (data) => {
-    const id = await nextId('gallery');
-    return Gallery.create({ ...data, id });
-  },
-  updateGalleryItem: (id, data) => Gallery.updateOne({ id }, data),
-  deleteGalleryItem: (id) => Gallery.deleteOne({ id }),
+  getAllGallery: () => db.prepare('SELECT * FROM gallery ORDER BY display_order, id').all(),
+  getGalleryById: (id) => db.prepare('SELECT * FROM gallery WHERE id = ?').get(id),
+  createGalleryItem: (data) => db.prepare('INSERT INTO gallery (image_path, alt_text, is_tall, display_order) VALUES (@image_path, @alt_text, @is_tall, @display_order)').run(data),
+  updateGalleryItem: (id, data) => db.prepare('UPDATE gallery SET alt_text=@alt_text, is_tall=@is_tall, display_order=@display_order WHERE id=@id').run({ ...data, id }),
+  deleteGalleryItem: (id) => db.prepare('DELETE FROM gallery WHERE id = ?').run(id),
 
   // Testimonials
-  getApprovedTestimonials: () => Testimonial.find({ status: 'approved' }).sort({ display_order: 1, id: -1 }).then(plainAll),
-  getAllTestimonials: async () => {
-    const docs = await Testimonial.find().then(plainAll);
-    return docs.sort((a, b) => {
-      const pendingDiff = (b.status === 'pending') - (a.status === 'pending');
-      return pendingDiff !== 0 ? pendingDiff : b.id - a.id;
-    });
-  },
-  getTestimonialById: (id) => Testimonial.findOne({ id }).then(plain),
-  submitTestimonial: async (data) => {
-    const id = await nextId('testimonials');
-    return Testimonial.create({ ...data, id, display_order: 0, status: 'pending', created_at: new Date().toISOString() });
-  },
-  createTestimonial: async (data) => {
-    const id = await nextId('testimonials');
-    return Testimonial.create({ ...data, id, status: 'approved', created_at: new Date().toISOString() });
-  },
-  updateTestimonial: (id, data) => Testimonial.updateOne({ id }, data),
-  setTestimonialStatus: (id, status) => Testimonial.updateOne({ id }, { status }),
-  deleteTestimonial: (id) => Testimonial.deleteOne({ id }),
+  // Public-facing: only reviews an admin has actually approved.
+  getApprovedTestimonials: () => db.prepare("SELECT * FROM testimonials WHERE status = 'approved' ORDER BY display_order, id DESC").all(),
+  // Admin dashboard: every submission, newest first, so pending ones surface for moderation.
+  getAllTestimonials: () => db.prepare('SELECT * FROM testimonials ORDER BY (status = \'pending\') DESC, id DESC').all(),
+  getTestimonialById: (id) => db.prepare('SELECT * FROM testimonials WHERE id = ?').get(id),
+  // A real visitor submitting the public review form — always starts pending.
+  submitTestimonial: (data) => db.prepare(`
+    INSERT INTO testimonials (name, package_name, quote, rating, display_order, status, email, created_at)
+    VALUES (@name, @package_name, @quote, @rating, 0, 'pending', @email, datetime('now'))
+  `).run(data),
+  // Admin manually adding a review (e.g. one collected over phone/WhatsApp) — goes live immediately.
+  createTestimonial: (data) => db.prepare(`
+    INSERT INTO testimonials (name, package_name, quote, rating, display_order, status, email, created_at)
+    VALUES (@name, @package_name, @quote, @rating, @display_order, 'approved', @email, datetime('now'))
+  `).run(data),
+  updateTestimonial: (id, data) => db.prepare('UPDATE testimonials SET name=@name, package_name=@package_name, quote=@quote, rating=@rating, display_order=@display_order WHERE id=@id').run({ ...data, id }),
+  setTestimonialStatus: (id, status) => db.prepare('UPDATE testimonials SET status=? WHERE id=?').run(status, id),
+  deleteTestimonial: (id) => db.prepare('DELETE FROM testimonials WHERE id = ?').run(id),
 
   // Settings
-  getAllSettings: async () => {
-    const rows = await Setting.find();
+  getAllSettings: () => {
+    const rows = db.prepare('SELECT key, value FROM settings').all();
     const out = {};
     rows.forEach(r => out[r.key] = r.value);
     return out;
   },
-  getSetting: async (key) => {
-    const r = await Setting.findOne({ key });
+  getSetting: (key) => {
+    const r = db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
     return r ? r.value : null;
   },
-  setSetting: (key, value) => Setting.updateOne({ key }, { value }, { upsert: true }),
+  setSetting: (key, value) => db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(key, value),
 
   // Bookings
-  createBooking: async (data) => {
-    const id = await nextId('bookings');
-    await Booking.create({ ...data, id, status: 'pending', created_at: new Date().toISOString() });
-    return { lastInsertRowid: id };
-  },
-  getAllBookings: async () => {
-    const docs = await Booking.find().then(plainAll);
-    return docs.sort((a, b) => {
-      const pendingDiff = (b.status === 'pending') - (a.status === 'pending');
-      return pendingDiff !== 0 ? pendingDiff : b.id - a.id;
-    });
-  },
-  getBookingById: (id) => Booking.findOne({ id }).then(plain),
-  setBookingStatus: (id, status) => Booking.updateOne({ id }, { status }),
-  deleteBooking: (id) => Booking.deleteOne({ id }),
+  // A visitor submitting the booking form on a package page — always starts pending.
+  createBooking: (data) => db.prepare(`
+    INSERT INTO bookings (name, phone, email, package_slug, package_name, travel_date, group_size, message, status, created_at)
+    VALUES (@name, @phone, @email, @package_slug, @package_name, @travel_date, @group_size, @message, 'pending', datetime('now'))
+  `).run(data),
+  getAllBookings: () => db.prepare("SELECT * FROM bookings ORDER BY (status = 'pending') DESC, id DESC").all(),
+  getBookingById: (id) => db.prepare('SELECT * FROM bookings WHERE id = ?').get(id),
+  setBookingStatus: (id, status) => db.prepare('UPDATE bookings SET status=? WHERE id=?').run(status, id),
+  deleteBooking: (id) => db.prepare('DELETE FROM bookings WHERE id = ?').run(id),
 
   // Enquiries
-  createEnquiry: async (data) => {
-    const id = await nextId('enquiries');
-    await Enquiry.create({ ...data, id, status: 'new', created_at: new Date().toISOString() });
-    return { lastInsertRowid: id };
-  },
-  getAllEnquiries: async () => {
-    const docs = await Enquiry.find().then(plainAll);
-    return docs.sort((a, b) => {
-      const newDiff = (b.status === 'new') - (a.status === 'new');
-      return newDiff !== 0 ? newDiff : b.id - a.id;
-    });
-  },
-  getEnquiryById: (id) => Enquiry.findOne({ id }).then(plain),
-  setEnquiryStatus: (id, status) => Enquiry.updateOne({ id }, { status }),
-  deleteEnquiry: (id) => Enquiry.deleteOne({ id }),
+  // Every contact-form submission lands here first, regardless of whether the
+  // visitor also opens WhatsApp — so nothing gets lost if they never send that message.
+  createEnquiry: (data) => db.prepare(`
+    INSERT INTO enquiries (name, phone, email, message, source, status, created_at)
+    VALUES (@name, @phone, @email, @message, @source, 'new', datetime('now'))
+  `).run(data),
+  getAllEnquiries: () => db.prepare("SELECT * FROM enquiries ORDER BY (status = 'new') DESC, id DESC").all(),
+  getEnquiryById: (id) => db.prepare('SELECT * FROM enquiries WHERE id = ?').get(id),
+  setEnquiryStatus: (id, status) => db.prepare('UPDATE enquiries SET status=? WHERE id=?').run(status, id),
+  deleteEnquiry: (id) => db.prepare('DELETE FROM enquiries WHERE id = ?').run(id),
 
-  // ─── Availability blocks ──────────────────────────────────────────────────
-  getAvailabilityBySlug: (slug) => AvailabilityBlock.find({ package_slug: slug }).sort({ start_date: 1 }).then(plainAll),
-
-  getAllAvailability: async () => {
-    const blocks = await AvailabilityBlock.find().sort({ start_date: 1 }).then(plainAll);
-    const slugs = [...new Set(blocks.map(b => b.package_slug))];
-    const pkgs = await Package.find({ slug: { $in: slugs } });
-    const nameBySlug = {};
-    pkgs.forEach(p => nameBySlug[p.slug] = p.name);
-    return blocks.map(b => ({ ...b, package_name: nameBySlug[b.package_slug] || null }));
-  },
-
-  createAvailabilityBlock: async (data) => {
-    const id = await nextId('availability_blocks');
-    await AvailabilityBlock.create({ ...data, id, created_at: new Date().toISOString() });
-    return { lastInsertRowid: id };
-  },
-
-  deleteAvailabilityBlock: (id) => AvailabilityBlock.deleteOne({ id }),
-
-  // ─── Blog ───────────────────────────────────────────────────────────────
-  getPublishedBlogPosts: () => BlogPost.find({ status: 'published' }).sort({ published_at: -1 }).then(plainAll),
-  getAllBlogPosts: async () => {
-    const docs = await BlogPost.find().then(plainAll);
-    return docs.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
-  },
-  getBlogPostBySlug: (slug) => BlogPost.findOne({ slug }).then(plain),
-  getBlogPostById: (id) => BlogPost.findOne({ id }).then(plain),
-  createBlogPost: async (data) => {
-    const id = await nextId('blog_posts');
-    const now = new Date().toISOString();
-    await BlogPost.create({
-      ...data, id,
-      tags: parseArrayField(data.tags),
-      published_at: data.status === 'published' ? (data.published_at || now) : null,
-      created_at: now, updated_at: now
-    });
-    return { lastInsertRowid: id };
-  },
-  updateBlogPost: async (id, data) => {
-    const existing = await BlogPost.findOne({ id });
-    const wasPublished = existing && existing.status === 'published';
-    const nowPublishing = data.status === 'published';
-    return BlogPost.updateOne({ id }, {
-      ...data,
-      tags: parseArrayField(data.tags),
-      // Set published_at the first time a post goes live; never overwrite it on later edits.
-      published_at: (!wasPublished && nowPublishing) ? new Date().toISOString() : (existing ? existing.published_at : null),
-      updated_at: new Date().toISOString()
-    });
-  },
-  deleteBlogPost: (id) => BlogPost.deleteOne({ id }),
-
-  // ─── Payment transactions ─────────────────────────────────────────────────
-  createPaymentTransaction: async (data) => {
-    const id = await nextId('payment_transactions');
-    const doc = await PaymentTransaction.create({ ...data, id, created_at: new Date().toISOString() });
-    return plain(doc);
-  },
-  getPaymentTransactionByOrderId: (orderId) => PaymentTransaction.findOne({ razorpay_order_id: orderId }).then(plain),
-  setPaymentTransactionStatus: (id, status, extra = {}) => PaymentTransaction.updateOne({ id }, { status, ...extra }),
-  getAllPaymentTransactions: async () => {
-    const docs = await PaymentTransaction.find().then(plainAll);
-    return docs.sort((a, b) => b.id - a.id);
-  },
+  // Availability blocks
+  // Public: dates blocked out for one package (used by the package detail page's calendar).
+  getAvailabilityBySlug: (slug) => db.prepare(
+    'SELECT * FROM availability WHERE package_slug = ? ORDER BY start_date'
+  ).all(slug),
+  // Admin: every block across every package, joined to the package name for display.
+  getAllAvailability: () => db.prepare(`
+    SELECT a.*, p.name AS package_name
+    FROM availability a
+    LEFT JOIN packages p ON p.slug = a.package_slug
+    ORDER BY a.start_date DESC, a.id DESC
+  `).all(),
+  createAvailabilityBlock: (data) => db.prepare(`
+    INSERT INTO availability (package_slug, start_date, end_date, reason)
+    VALUES (@package_slug, @start_date, @end_date, @reason)
+  `).run(data),
+  deleteAvailabilityBlock: (id) => db.prepare('DELETE FROM availability WHERE id = ?').run(id),
 
   // Stats (for the admin analytics dashboard)
-  getStats: async () => {
-    const packages = await Package.countDocuments();
-    const bookings = await Booking.countDocuments();
-    const bookingsPending = await Booking.countDocuments({ status: 'pending' });
-    const bookingsConfirmed = await Booking.countDocuments({ status: 'confirmed' });
-    const bookingsCancelled = await Booking.countDocuments({ status: 'cancelled' });
-    const enquiries = await Enquiry.countDocuments();
-    const enquiriesNew = await Enquiry.countDocuments({ status: 'new' });
-    const enquiriesClosed = await Enquiry.countDocuments({ status: 'closed' });
-    const testimonialsPending = await Testimonial.countDocuments({ status: 'pending' });
-
-    const allBookings = await Booking.find();
-    const allEnquiries = await Enquiry.find();
-
-    // Most-booked package
-    const bookingCounts = {};
-    allBookings.forEach(b => {
-      if (b.package_name) bookingCounts[b.package_name] = (bookingCounts[b.package_name] || 0) + 1;
-    });
-    const mostBookedEntry = Object.entries(bookingCounts).sort((a, b) => b[1] - a[1])[0];
-    const mostBookedPackage = mostBookedEntry ? mostBookedEntry[0] : null;
-
-    // Bookings by day, last 30 days
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const byDay = {};
-    allBookings
-      .filter(b => new Date(b.created_at) >= thirtyDaysAgo)
-      .forEach(b => {
-        const day = (b.created_at || '').slice(0, 10);
-        byDay[day] = (byDay[day] || 0) + 1;
-      });
-    const bookingsByDay = Object.entries(byDay)
-      .map(([day, c]) => ({ day, c }))
-      .sort((a, b) => a.day.localeCompare(b.day));
-
-    // Package popularity — bookings + enquiries combined, ranked
-    const popularity = {};
-    allBookings.forEach(b => { if (b.package_name) popularity[b.package_name] = (popularity[b.package_name] || 0) + 1; });
-    allEnquiries.forEach(e => { if (e.package_name) popularity[e.package_name] = (popularity[e.package_name] || 0) + 1; });
-    const packagePopularity = Object.entries(popularity)
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 8);
-
-    // Recent activity feed
-    const recentBookings = allBookings
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-      .slice(0, 8)
-      .map(b => ({ type: 'booking', id: b.id, name: b.name, package_name: b.package_name, status: b.status, created_at: b.created_at }));
-    const recentEnquiries = allEnquiries
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-      .slice(0, 8)
-      .map(e => ({ type: 'enquiry', id: e.id, name: e.name, package_name: e.package_name, status: e.status, created_at: e.created_at }));
-    const recentActivity = [...recentBookings, ...recentEnquiries]
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-      .slice(0, 8);
-
+  getStats: () => {
+    const packages = db.prepare('SELECT COUNT(*) as c FROM packages').get().c;
+    const bookings = db.prepare('SELECT COUNT(*) as c FROM bookings').get().c;
+    const bookingsPending = db.prepare("SELECT COUNT(*) as c FROM bookings WHERE status = 'pending'").get().c;
+    const bookingsConfirmed = db.prepare("SELECT COUNT(*) as c FROM bookings WHERE status = 'confirmed'").get().c;
+    const bookingsCancelled = db.prepare("SELECT COUNT(*) as c FROM bookings WHERE status = 'cancelled'").get().c;
+    const enquiries = db.prepare('SELECT COUNT(*) as c FROM enquiries').get().c;
+    const enquiriesNew = db.prepare("SELECT COUNT(*) as c FROM enquiries WHERE status = 'new'").get().c;
+    const enquiriesClosed = db.prepare("SELECT COUNT(*) as c FROM enquiries WHERE status = 'closed'").get().c;
+    const testimonialsPending = db.prepare("SELECT COUNT(*) as c FROM testimonials WHERE status = 'pending'").get().c;
+    const mostBookedPackage = db.prepare(`
+      SELECT package_name, COUNT(*) as c FROM bookings
+      WHERE package_name IS NOT NULL AND package_name != ''
+      GROUP BY package_name ORDER BY c DESC LIMIT 1
+    `).get();
+    const bookingsByDay = db.prepare(`
+      SELECT date(created_at) as day, COUNT(*) as c FROM bookings
+      WHERE created_at >= datetime('now', '-30 days')
+      GROUP BY day ORDER BY day
+    `).all();
+    // Packages ranked by booking volume — enquiries aren't linked to a specific
+    // package in the schema, so this reflects bookings only.
+    const packagePopularity = db.prepare(`
+      SELECT package_name AS name, COUNT(*) as count FROM bookings
+      WHERE package_name IS NOT NULL AND package_name != ''
+      GROUP BY package_name ORDER BY count DESC LIMIT 6
+    `).all();
+    // Most recent bookings + enquiries combined, newest first, for the dashboard feed.
+    const recentActivity = db.prepare(`
+      SELECT 'booking' AS type, name, package_name, status, created_at FROM bookings
+      UNION ALL
+      SELECT 'enquiry' AS type, name, NULL AS package_name, status, created_at FROM enquiries
+      ORDER BY created_at DESC LIMIT 8
+    `).all();
     return {
       packages, bookings, bookingsPending, bookingsConfirmed, bookingsCancelled,
       enquiries, enquiriesNew, enquiriesClosed, testimonialsPending,
-      mostBookedPackage, bookingsByDay, packagePopularity, recentActivity
+      mostBookedPackage: mostBookedPackage ? mostBookedPackage.package_name : null,
+      bookingsByDay, packagePopularity, recentActivity
     };
   }
 };

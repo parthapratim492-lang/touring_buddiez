@@ -47,7 +47,6 @@
     if (packages && packages.length) renderHomePackages(packages, settings);
     if (rentals && rentals.length) renderRentals(rentals, settings);
     if (gallery && gallery.length) renderGallery(gallery);
-    if (window.__initGallerySlideshow) window.__initGallerySlideshow();
     renderTestimonials(testimonials || []);
   }
 
@@ -55,17 +54,21 @@
     // Update stat counters
     const statMap = {
       stat_destinations: 'data-count',
+      stat_travelers: 'data-count',
       stat_years: 'data-count',
       stat_rating: 'data-count'
     };
-    // Update the stats band
+    // Update hero stats and main stats section
     document.querySelectorAll('[data-count]').forEach(el => {
       const val = parseFloat(el.getAttribute('data-count'));
       // Match by parent text
-      const parent = el.closest('.stat');
+      const parent = el.closest('.stat, .hero-stat');
       if (!parent) return;
       const label = parent.querySelector('span')?.textContent?.toLowerCase() || '';
       if (label.includes('destination') && s.stat_destinations) el.setAttribute('data-count', s.stat_destinations);
+      else if (label.includes('traveler') || label.includes('happy')) {
+        if (s.stat_travelers) el.setAttribute('data-count', s.stat_travelers);
+      }
       else if (label.includes('founded')) {
         if (s.stat_years) el.setAttribute('data-count', s.stat_years);
       }
@@ -193,7 +196,6 @@
     grid.innerHTML = items.map(item => `
       <div class="g-item${item.is_tall ? ' tall' : ''}">
         <img src="/${item.image_path}" alt="${esc(item.alt_text || 'Travel photo')}" loading="lazy">
-        ${item.location ? `<span class="g-location"><i class="fa-solid fa-location-dot"></i> ${esc(item.location)}</span>` : ''}
       </div>
     `).join('');
   }
@@ -358,17 +360,17 @@
       provider: {
         '@type': 'TravelAgency',
         name: 'Touring Buddiez',
-        url: 'https://touringbuddieznortheast.in/'
+        url: 'https://touringbuddiez.com/'
       },
       offers: priceNumber ? {
         '@type': 'Offer',
         price: priceNumber,
         priceCurrency: 'INR',
         availability: 'https://schema.org/InStock',
-        url: `https://touringbuddieznortheast.in/package-detail.html?slug=${pkg.slug}`
+        url: `https://touringbuddiez.com/package-detail.html?slug=${pkg.slug}`
       } : undefined
     };
-    if (pkg.image_path) data.image = `https://touringbuddieznortheast.in/${pkg.image_path}`;
+    if (pkg.image_path) data.image = `https://touringbuddiez.com/${pkg.image_path}`;
     el.textContent = JSON.stringify(data);
   }
 
@@ -385,25 +387,13 @@
 
     setMetaTag('property', 'og:title', document.title);
     setMetaTag('property', 'og:description', pkg.description || `${pkg.name} — ${pkg.route}`);
-    setMetaTag('property', 'og:url', `https://touringbuddieznortheast.in/package-detail.html?slug=${pkg.slug}`);
-    if (pkg.image_path) setMetaTag('property', 'og:image', `https://touringbuddieznortheast.in/${pkg.image_path}`);
-    setCanonical(`https://touringbuddieznortheast.in/package-detail.html?slug=${pkg.slug}`);
-
-    const kwMeta = document.querySelector('meta[name="keywords"]');
-    if (kwMeta) {
-      const routeStops = (Array.isArray(pkg.route_stops) ? pkg.route_stops : [])
-        .map(s => (typeof s === 'string' ? s : s.name)).filter(Boolean);
-      const kwParts = [
-        pkg.name, `${pkg.name} tour package`, `${pkg.name} itinerary`,
-        pkg.route, ...routeStops, 'Northeast India tour packages',
-        'Touring Buddiez', 'Guwahati tour operator'
-      ].filter(Boolean);
-      kwMeta.content = [...new Set(kwParts)].join(', ');
-    }
+    setMetaTag('property', 'og:url', `https://touringbuddiez.com/package-detail.html?slug=${pkg.slug}`);
+    if (pkg.image_path) setMetaTag('property', 'og:image', `https://touringbuddiez.com/${pkg.image_path}`);
+    setCanonical(`https://touringbuddiez.com/package-detail.html?slug=${pkg.slug}`);
 
     setMetaTag('name', 'twitter:title', document.title);
     setMetaTag('name', 'twitter:description', pkg.description || `${pkg.name} — ${pkg.route}`);
-    if (pkg.image_path) setMetaTag('name', 'twitter:image', `https://touringbuddieznortheast.in/${pkg.image_path}`);
+    if (pkg.image_path) setMetaTag('name', 'twitter:image', `https://touringbuddiez.com/${pkg.image_path}`);
 
     setStructuredData(pkg);
 
@@ -446,15 +436,6 @@
             <h2>Highlights</h2>
             <div class="pkg-inclusions-grid">
               ${high.map(h => `<div><i class="fa-solid fa-star" style="color:var(--brass-500)"></i> ${esc(h)}</div>`).join('')}
-            </div>
-          ` : ''}
-
-          ${Array.isArray(pkg.gallery_images) && pkg.gallery_images.length ? `
-            <h2>Photos from this trip</h2>
-            <div class="pkg-gallery-grid">
-              ${pkg.gallery_images.map(img => `
-                <div class="g-item"><img src="/${esc(img)}" alt="${esc(pkg.name)} photo" loading="lazy"></div>
-              `).join('')}
             </div>
           ` : ''}
 
@@ -545,7 +526,6 @@
       });
     }
 
-    if (window.__initGallerySlideshow) window.__initGallerySlideshow();
     renderAvailabilityCalendar(pkg.slug);
   }
 

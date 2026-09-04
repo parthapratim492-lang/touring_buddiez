@@ -83,16 +83,16 @@
   }
 
   /* ---------------------------------------------------------------------
-     3. CUSTOM CURSOR (desktop only) — a small dot everywhere, growing into
-     a circle with a "VIEW"/"EXPLORE" label over large images specifically.
+     3. CUSTOM CURSOR (desktop only)
+     States: small dot by default, a soft ring over any link/button, and a
+     text label — VIEW over editorial images, OPEN over the gallery — so the
+     cursor itself tells you what a hover does instead of relying on a
+     regular pointer.
   --------------------------------------------------------------------- */
   function initCursor() {
     if (isTouch || reduceMotion) return;
     const dot = document.createElement("div");
     dot.className = "cursor-dot";
-    const label = document.createElement("span");
-    label.className = "cursor-dot-label";
-    dot.appendChild(label);
     document.body.appendChild(dot);
 
     let x = 0, y = 0, cx = 0, cy = 0;
@@ -104,94 +104,31 @@
       requestAnimationFrame(raf);
     })();
 
+    const setLabel = (text) => {
+      dot.textContent = text || "";
+      dot.classList.toggle("is-label", Boolean(text));
+    };
+
     const hoverables = "a, button, .tilt, input, textarea, select";
     document.addEventListener("mouseover", (e) => {
-      if (e.target.closest(hoverables)) dot.classList.add("is-hover");
-    });
-    document.addEventListener("mouseout", (e) => {
-      if (e.target.closest(hoverables)) dot.classList.remove("is-hover");
-    });
-
-    // Large-image hover: swap the small dot for a bigger circle with a
-    // short label, so a big photo invites a click instead of just sitting
-    // there passively.
-    const imageTargets = [
-      { sel: ".pkg-card .media-zoom, .veh-card .media-zoom", text: "View" },
-      { sel: ".g-item", text: "View" },
-      { sel: ".exp-card", text: "Explore" },
-      { sel: ".offbeat-media, .cinematic-cta-media", text: "Explore" }
-    ];
-    document.addEventListener("mouseover", (e) => {
-      for (const t of imageTargets) {
-        if (e.target.closest(t.sel)) {
-          label.textContent = t.text;
-          dot.classList.add("is-image");
-          return;
-        }
+      const gallery = e.target.closest(".g-item");
+      const zoom = e.target.closest(".media-zoom");
+      if (gallery) {
+        setLabel("OPEN");
+        dot.classList.add("is-hover");
+      } else if (zoom) {
+        setLabel("VIEW");
+        dot.classList.add("is-hover");
+      } else if (e.target.closest(hoverables)) {
+        setLabel("");
+        dot.classList.add("is-hover");
       }
     });
     document.addEventListener("mouseout", (e) => {
-      for (const t of imageTargets) {
-        if (e.target.closest(t.sel)) { dot.classList.remove("is-image"); return; }
+      if (e.target.closest(".g-item, .media-zoom, " + hoverables)) {
+        dot.classList.remove("is-hover");
+        setLabel("");
       }
-    });
-  }
-
-  /* ---------------------------------------------------------------------
-     3b. MAGNETIC BUTTONS (desktop only) — primary CTAs nudge 3-5px toward
-     the cursor on hover. Deliberately tiny; the user should barely notice.
-  --------------------------------------------------------------------- */
-  function initMagneticButtons() {
-    if (isTouch || reduceMotion) return;
-    const targets = document.querySelectorAll(".btn-primary");
-    const MAX = 5;
-    targets.forEach((btn) => {
-      btn.addEventListener("mousemove", (e) => {
-        const r = btn.getBoundingClientRect();
-        const relX = (e.clientX - r.left) / r.width - 0.5;
-        const relY = (e.clientY - r.top) / r.height - 0.5;
-        // -2px keeps the existing CSS hover-lift feel instead of the JS
-        // transform silently overriding it (inline styles win over :hover).
-        btn.style.transform = `translate(${relX * MAX * 2}px, ${relY * MAX * 2 - 2}px)`;
-      });
-      btn.addEventListener("mouseleave", () => { btn.style.transform = ""; });
-    });
-  }
-
-  /* ---------------------------------------------------------------------
-     3c. PAGE TRANSITION — opening a destination page feels like the next
-     chapter of the journey rather than an instant swap. A dark overlay
-     fades in, then the browser navigates. Skipped entirely for
-     reduced-motion (instant navigation) and never hijacks new-tab clicks
-     (middle-click, ctrl/cmd-click, or target="_blank").
-  --------------------------------------------------------------------- */
-  function initPageTransition() {
-    const overlay = document.querySelector(".page-transition");
-    if (!overlay) return;
-
-    // Safety net for the browser back/forward button: when this page was
-    // left, the overlay was mid-fade (is-active) right before navigating
-    // away. Browsers often restore the *exact* DOM snapshot from that
-    // moment via the back/forward cache (bfcache) instead of reloading —
-    // which would otherwise leave that dark overlay stuck on screen,
-    // fully opaque, blocking the page it "went back to". pageshow fires
-    // on every visit, including bfcache restores (event.persisted), so
-    // this always clears it before the user can see it stuck.
-    window.addEventListener("pageshow", () => {
-      overlay.classList.remove("is-active");
-    });
-
-    if (reduceMotion) return;
-
-    document.addEventListener("click", (e) => {
-      const link = e.target.closest('a[href*="package-detail.html"]');
-      if (!link) return;
-      if (link.target === "_blank" || e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
-
-      const href = link.href;
-      e.preventDefault();
-      overlay.classList.add("is-active");
-      setTimeout(() => { window.location.href = href; }, 550);
     });
   }
 
@@ -235,6 +172,70 @@
   }
 
   window.__reinitReveals = observeReveals;
+
+  /* ---------------------------------------------------------------------
+     4b. MASKED HEADLINE REVEAL
+     Wraps each line of the hero h1 and every section h2 in an
+     overflow-hidden mask, then slides the text up from underneath on
+     scroll — a "curtain rising" reveal instead of a plain fade, reserved
+     for headlines since spec calls for this on the most important text
+     only. Runs once; safe to no-op on a second call.
+  --------------------------------------------------------------------- */
+  let maskObserver = null;
+
+  function initMaskReveal() {
+    const heads = document.querySelectorAll(".hero h1, .section-head h2");
+    if (!heads.length) return;
+
+    heads.forEach((h) => {
+      if (h.dataset.maskBound) return;
+      const lines = h.innerHTML.split(/<br\s*\/?>/i);
+      h.innerHTML = lines
+        .map((line) => `<span class="mask-line"><span class="mask-inner">${line}</span></span>`)
+        .join("");
+      h.classList.add("has-mask");
+      h.dataset.maskBound = "1";
+    });
+
+    if (reduceMotion) {
+      heads.forEach((h) => h.classList.add("is-visible"));
+      return;
+    }
+
+    if (!maskObserver) {
+      maskObserver = new IntersectionObserver(
+        (entries, o) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add("is-visible");
+              o.unobserve(entry.target);
+            }
+          });
+        },
+        { threshold: 0.4 }
+      );
+    }
+    heads.forEach((h) => maskObserver.observe(h));
+  }
+
+  /* ---------------------------------------------------------------------
+     4c. MAGNETIC BUTTONS
+     Primary CTAs drift a few px toward the cursor as it approaches, then
+     ease back on leave — restrained (max 6px) per spec, desktop only.
+  --------------------------------------------------------------------- */
+  function initMagnetic() {
+    if (isTouch || reduceMotion) return;
+    document.querySelectorAll(".btn-primary").forEach((btn) => {
+      const strength = 6;
+      btn.addEventListener("mousemove", (e) => {
+        const r = btn.getBoundingClientRect();
+        const px = (e.clientX - r.left) / r.width - 0.5;
+        const py = (e.clientY - r.top) / r.height - 0.5;
+        btn.style.transform = `translate(${px * strength}px, ${py * strength - 2}px)`;
+      });
+      btn.addEventListener("mouseleave", () => { btn.style.transform = ""; });
+    });
+  }
 
   /* ---------------------------------------------------------------------
      5. STAT COUNTERS
@@ -293,7 +294,6 @@
       });
     });
   }
-  window.__initTilt = initTilt;
 
   /* ---------------------------------------------------------------------
      7. BUTTON RIPPLE
@@ -335,11 +335,29 @@
 
   /* ---------------------------------------------------------------------
      8b. HERO VIDEO SEQUENCE — plays hero1 → hero2 → hero3 → loop,
-     crossfading between clips. On very slow connections or data-saver,
-     falls back to a lightweight photo slideshow instead (same crossfade
-     feel, far less bandwidth than three videos). Reduced-motion users get
-     a single still photo with no cycling at all, full stop.
+     crossfading between clips. Falls back to the poster image on very
+     slow connections or if data-saver is on, so no one is forced to
+     download three video files on a bad signal.
   --------------------------------------------------------------------- */
+  /* ---------------------------------------------------------------------
+     8c. ABOUT IMAGE PARALLAX — a light vertical drift on the story photo
+     as it crosses the viewport. Same reduced-motion guard as the hero.
+  --------------------------------------------------------------------- */
+  function initAboutParallax() {
+    const media = document.querySelector(".about-media .media-zoom img");
+    if (!media || reduceMotion) return;
+    window.addEventListener(
+      "scroll",
+      () => {
+        const rect = media.closest(".about").getBoundingClientRect();
+        const progress = (window.innerHeight - rect.top) / (window.innerHeight + rect.height);
+        const y = (Math.min(Math.max(progress, 0), 1) - 0.5) * 40;
+        media.style.transform = `translateY(${y}px) scale(1.08)`;
+      },
+      { passive: true }
+    );
+  }
+
   function initHeroVideo() {
     const media = document.getElementById("hero-media");
     if (!media) return;
@@ -348,10 +366,8 @@
 
     const conn = navigator.connection || navigator.webkitConnection || navigator.mozConnection;
     const dataSaver = conn && (conn.saveData || /2g/.test(conn.effectiveType || ""));
-
     if (dataSaver || reduceMotion) {
       media.classList.add("no-video");
-      if (!reduceMotion) initHeroPhotoSlideshow(media); // data-saver only, not reduced-motion
       return;
     }
 
@@ -364,7 +380,6 @@
       const next = videos[(i + 1) % videos.length];
       if (next.preload === "none") next.preload = "auto";
       const active = videos[i];
-      active.currentTime = 0; // guarantee a clean restart each time this clip comes back around
       const playPromise = active.play();
       if (playPromise) playPromise.catch(() => {}); // autoplay can be blocked; poster still shows
     };
@@ -374,131 +389,83 @@
         current = (i + 1) % videos.length;
         activate(current);
       });
-      // If a clip errors out entirely (unsupported codec, failed fetch,
-      // etc.) fall back to the photo slideshow rather than showing nothing.
-      v.addEventListener("error", () => {
-        media.classList.add("no-video");
-        initHeroPhotoSlideshow(media);
-      });
     });
 
     activate(0);
   }
 
-  function initHeroPhotoSlideshow(media) {
-    if (media.dataset.slideshowRunning) return;
-    media.dataset.slideshowRunning = "true";
-    const photos = [...media.querySelectorAll(".hero-fallback")];
-    if (photos.length < 2) return;
-    let i = photos.findIndex((p) => p.classList.contains("is-active"));
-    if (i < 0) i = 0;
-    setInterval(() => {
-      photos[i].classList.remove("is-active");
-      i = (i + 1) % photos.length;
-      photos[i].classList.add("is-active");
-    }, 6000);
-  }
-
   /* ---------------------------------------------------------------------
-     9. GALLERY SLIDESHOW — click any photo to open a full slideshow across
-     every photo in the gallery (not just the ones visible on screen).
-     Arrow keys / on-screen arrows / swipe to navigate, plus a play/pause
-     toggle for a gentle auto-advance. Re-initialized after site-data.js
-     injects the gallery photos (see window.__initGallerySlideshow below),
-     since that content loads asynchronously after this file first runs —
-     slides/index/playing live in this outer scope (not re-created per
-     call) so the nav controls, wired only once, always read current data.
+     9. GALLERY LIGHTBOX
+     Uses event delegation on .gallery-grid (not per-item listeners) since
+     the grid's actual photos are re-rendered from the API after load (see
+     site-data.js) — binding directly to the items present at DOMContentLoaded
+     would silently stop working the moment real gallery data arrives.
+     Supports Escape, ←/→ between photos, and returns focus to whichever
+     thumbnail opened it.
   --------------------------------------------------------------------- */
-  let slideshowTimer = null;
-  let gsSlides = [];
-  let gsIndex = 0;
-  let gsPlaying = false;
-
   function initLightbox() {
-    const items = [...document.querySelectorAll(".g-item")];
+    const grid = document.querySelector(".gallery-grid");
     const lightbox = document.querySelector(".lightbox");
-    if (!items.length || !lightbox) return;
+    if (!grid || !lightbox) return;
 
     const img = lightbox.querySelector("img");
-    const close = lightbox.querySelector(".lightbox-close");
+    const closeBtn = lightbox.querySelector(".lightbox-close");
     const prevBtn = lightbox.querySelector(".lightbox-prev");
     const nextBtn = lightbox.querySelector(".lightbox-next");
-    const playBtn = lightbox.querySelector(".lightbox-play");
-    const counter = lightbox.querySelector(".lightbox-counter");
-
-    // Refresh the shared slide list every time this runs (static fallback
-    // markup first, then the real photos once site-data.js loads them).
-    gsSlides = items.map((item) => {
-      const im = item.querySelector("img");
-      return { src: im.src, alt: im.alt };
-    });
+    let items = [];
+    let index = 0;
+    let lastFocused = null;
 
     const show = (i) => {
-      gsIndex = (i + gsSlides.length) % gsSlides.length;
-      const s = gsSlides[gsIndex];
-      img.src = s.src;
-      img.alt = s.alt;
-      if (counter) counter.textContent = `${gsIndex + 1} / ${gsSlides.length}`;
+      items = [...grid.querySelectorAll(".g-item img")];
+      if (!items.length) return;
+      index = (i + items.length) % items.length;
+      img.src = items[index].src;
+      img.alt = items[index].alt;
     };
 
-    const stopPlaying = () => {
-      gsPlaying = false;
-      if (slideshowTimer) clearInterval(slideshowTimer);
-      if (playBtn) playBtn.classList.remove("is-playing");
+    const open = (i, triggerEl) => {
+      lastFocused = triggerEl || document.activeElement;
+      show(i);
+      lightbox.classList.add("is-open");
+      lightbox.setAttribute("aria-hidden", "false");
+      document.body.classList.add("no-scroll");
+      closeBtn.focus();
     };
-    const startPlaying = () => {
-      if (reduceMotion) return; // no auto-advance for reduced-motion users
-      gsPlaying = true;
-      if (playBtn) playBtn.classList.add("is-playing");
-      slideshowTimer = setInterval(() => show(gsIndex + 1), 3500);
+    const close = () => {
+      lightbox.classList.remove("is-open");
+      lightbox.setAttribute("aria-hidden", "true");
+      document.body.classList.remove("no-scroll");
+      if (lastFocused && lastFocused.focus) lastFocused.focus();
     };
 
-    items.forEach((item, i) => {
-      item.addEventListener("click", () => {
-        show(i);
-        lightbox.classList.add("is-open");
-        document.body.classList.add("no-scroll");
-      });
+    grid.addEventListener("click", (e) => {
+      const item = e.target.closest(".g-item");
+      if (!item) return;
+      const all = [...grid.querySelectorAll(".g-item")];
+      open(all.indexOf(item), item);
     });
 
-    // The lightbox chrome itself (close/prev/next/play/keyboard/swipe) only
-    // needs wiring once — re-attaching on the second call (after dynamic
-    // gallery load) would double-fire every action. It's safe to wire once
-    // here because show/stopPlaying/startPlaying always read the shared
-    // gsSlides/gsIndex/gsPlaying above, which this function keeps current.
-    if (lightbox.dataset.wired) return;
-    lightbox.dataset.wired = "true";
-
-    const closeFn = () => {
-      lightbox.classList.remove("is-open");
-      document.body.classList.remove("no-scroll");
-      stopPlaying();
-    };
-
-    close.addEventListener("click", closeFn);
-    lightbox.addEventListener("click", (e) => { if (e.target === lightbox) closeFn(); });
-    if (prevBtn) prevBtn.addEventListener("click", () => { stopPlaying(); show(gsIndex - 1); });
-    if (nextBtn) nextBtn.addEventListener("click", () => { stopPlaying(); show(gsIndex + 1); });
-    if (playBtn) playBtn.addEventListener("click", () => (gsPlaying ? stopPlaying() : startPlaying()));
+    closeBtn.addEventListener("click", close);
+    prevBtn.addEventListener("click", () => show(index - 1));
+    nextBtn.addEventListener("click", () => show(index + 1));
+    lightbox.addEventListener("click", (e) => { if (e.target === lightbox) close(); });
 
     document.addEventListener("keydown", (e) => {
       if (!lightbox.classList.contains("is-open")) return;
-      if (e.key === "Escape") closeFn();
-      if (e.key === "ArrowRight") { stopPlaying(); show(gsIndex + 1); }
-      if (e.key === "ArrowLeft") { stopPlaying(); show(gsIndex - 1); }
+      if (e.key === "Escape") close();
+      else if (e.key === "ArrowLeft") show(index - 1);
+      else if (e.key === "ArrowRight") show(index + 1);
+      else if (e.key === "Tab") {
+        // Simple focus trap: only three focusable controls in the lightbox.
+        const focusable = [prevBtn, closeBtn, nextBtn];
+        const i = focusable.indexOf(document.activeElement);
+        e.preventDefault();
+        const next = e.shiftKey ? (i - 1 + focusable.length) % focusable.length : (i + 1) % focusable.length;
+        focusable[next].focus();
+      }
     });
-
-    // Basic swipe support for touch devices.
-    let touchStartX = null;
-    lightbox.addEventListener("touchstart", (e) => { touchStartX = e.touches[0].clientX; }, { passive: true });
-    lightbox.addEventListener("touchend", (e) => {
-      if (touchStartX === null) return;
-      const dx = e.changedTouches[0].clientX - touchStartX;
-      if (Math.abs(dx) > 40) { stopPlaying(); show(gsIndex + (dx < 0 ? 1 : -1)); }
-      touchStartX = null;
-    }, { passive: true });
   }
-  window.__initGallerySlideshow = initLightbox;
 
   /* ---------------------------------------------------------------------
      10. TESTIMONIAL SLIDER
@@ -641,6 +608,29 @@
      admin dashboard, even if the visitor never actually sends the
      WhatsApp message), then opens WhatsApp as before.
   --------------------------------------------------------------------- */
+  function initJourneyFinder() {
+    const form = document.querySelector('#journey-finder-form');
+    if (!form) return;
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const data = new FormData(form);
+      const contact = document.querySelector('#contact-form');
+      if (contact) {
+        const destEl = contact.querySelector('#destination');
+        const datesEl = contact.querySelector('#dates');
+        const travelersEl = contact.querySelector('#travelers');
+        const messageEl = contact.querySelector('#message');
+        if (destEl) destEl.value = data.get('destination') || '';
+        if (datesEl) datesEl.value = data.get('dates') || '';
+        if (travelersEl) travelersEl.value = data.get('travelers') || '';
+        const style = data.get('trip_style');
+        if (messageEl && style) messageEl.value = `Trip style: ${style}`;
+        document.querySelector('#contact')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        contact.querySelector('#name')?.focus({ preventScroll: true });
+      }
+    });
+  }
+
   function initContactForm() {
     const form = document.querySelector("#contact-form");
     if (!form) return;
@@ -652,7 +642,6 @@
       const dest = data.get("destination") || "";
       const dates = data.get("dates") || "";
       const travelers = data.get("travelers") || "";
-      const tripType = data.get("trip_type") || "";
       const msg = data.get("message") || "";
 
       const submitBtn = form.querySelector('button[type="submit"]');
@@ -664,7 +653,7 @@
 
       const enquiryMessage =
         `Destination: ${dest || "—"}. Travel dates: ${dates || "—"}. ` +
-        `Travelers: ${travelers || "—"}. Trip type: ${tripType || "—"}. Notes: ${msg || "—"}`;
+        `Travelers: ${travelers || "—"}. Notes: ${msg || "—"}`;
 
       fetch("/api/enquiries", {
         method: "POST",
@@ -685,7 +674,7 @@
           const text =
             `Hi Touring Buddiez! I'd like to plan a trip.%0A` +
             `Name: ${enc(name)}%0APhone: ${enc(phone)}%0ADestination: ${enc(dest)}%0A` +
-            `Travel dates: ${enc(dates)}%0ATravelers: ${enc(travelers)}%0ATrip type: ${enc(tripType)}%0ANotes: ${enc(msg)}`;
+            `Travel dates: ${enc(dates)}%0ATravelers: ${enc(travelers)}%0ANotes: ${enc(msg)}`;
           window.open(`https://wa.me/919707386186?text=${text}`, "_blank");
           form.reset();
           if (submitBtn) {
@@ -699,60 +688,25 @@
   /* ---------------------------------------------------------------------
      INIT
   --------------------------------------------------------------------- */
-  /* ---------------------------------------------------------------------
-     CONVERSION TRACKING — fires GA4 events on the moments that actually
-     matter for the business: WhatsApp taps and form submits. Entirely
-     safe to run before Analytics is activated (see the GA4 scaffold in
-     <head>) — gtag() is a no-op stub whenever the real tracking script
-     isn't loaded, so this never errors, it just quietly does nothing
-     until a real Measurement ID is in place.
-  --------------------------------------------------------------------- */
-  function initConversionTracking() {
-    if (typeof window.gtag !== "function") {
-      window.gtag = function () {}; // safe no-op stand-in
-    }
-
-    document.addEventListener("click", (e) => {
-      const wa = e.target.closest('a[href*="wa.me"]');
-      if (wa) {
-        window.gtag("event", "whatsapp_click", {
-          event_category: "engagement",
-          link_url: wa.href,
-          page_location: window.location.pathname
-        });
-      }
-    });
-
-    ["contact-form", "review-form"].forEach((id) => {
-      const form = document.getElementById(id);
-      if (!form) return;
-      form.addEventListener("submit", () => {
-        window.gtag("event", id === "contact-form" ? "generate_lead" : "submit_review", {
-          event_category: "engagement",
-          page_location: window.location.pathname
-        });
-      });
-    });
-  }
-
   document.addEventListener("DOMContentLoaded", () => {
     document.body.classList.add("no-scroll");
     initLoader();
     initNav();
     initCursor();
-    initMagneticButtons();
-    initPageTransition();
     initReveal();
+    initMaskReveal();
     initCounters();
     initTilt();
     initRipple();
+    initMagnetic();
     initParallax();
+    initAboutParallax();
     initHeroVideo();
     initLightbox();
     initTestimonials();
     initReviewForm();
     initContactForm();
-    initConversionTracking();
+    initJourneyFinder();
   });
 
   /* ---------------------------------------------------------------------

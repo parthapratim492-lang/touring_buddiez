@@ -4,6 +4,5 @@ Disallow: /admin/
 Disallow: /api/
 Disallow: /db/
 Disallow: /uploads/
-Disallow: /pay.html
 
-Sitemap: https://touringbuddieznortheast.in/sitemap.xml
+Sitemap: https://touringbuddiez.com/sitemap.xml

@@ -7,8 +7,8 @@
 // ─── State ───────────────────────────────────────────────────────────────────
 let currentSection = 'dashboard';
 let allPackages = [], allRentals = [], allGallery = [], allTestimonials = [];
-let allBookings = [], allEnquiries = [], allPayments = [], allBlogPosts = [];
-let editingPackageId = null, editingRentalId = null, editingTestimonialId = null, editingBlogId = null;
+let allBookings = [], allEnquiries = [];
+let editingPackageId = null, editingRentalId = null, editingTestimonialId = null;
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
@@ -76,27 +76,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // Payments form
-  document.getElementById('payments-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const form = e.target;
-    const data = Object.fromEntries(new FormData(form));
-    // Checkboxes only appear in FormData when checked — normalize to 'true'/'false' explicitly.
-    data.payments_upi_enabled = form.querySelector('#fld-payments_upi_enabled').checked ? 'true' : 'false';
-    data.payments_card_enabled = form.querySelector('#fld-payments_card_enabled').checked ? 'true' : 'false';
-    const msg = document.getElementById('payments-settings-msg');
-    try {
-      await api('PUT', '/api/settings', data);
-      msg.textContent = '✓ Payment settings saved!';
-      msg.style.display = 'block';
-      setTimeout(() => msg.style.display = 'none', 3000);
-      toast('Payment settings saved!');
-      loadPaymentSettings(); // refresh so the secret field shows the masked placeholder again
-    } catch (ex) {
-      toast('Error: ' + ex.message, true);
-    }
-  });
-
   // Password form
   document.getElementById('password-form').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -144,7 +123,7 @@ function showSection(name) {
   const titles = {
     dashboard: 'Dashboard', packages: 'Tour Packages', bookings: 'Bookings', enquiries: 'Enquiries',
     rentals: 'Rental Vehicles', availability: 'Package Availability', gallery: 'Gallery', testimonials: 'Testimonials',
-    blog: 'Blog', payments: 'Payments', settings: 'Site Settings', account: 'Change Password'
+    settings: 'Site Settings', account: 'Change Password'
   };
   document.getElementById('topbar-title').textContent = titles[name] || name;
 
@@ -157,8 +136,6 @@ function showSection(name) {
   else if (name === 'availability') loadAvailability();
   else if (name === 'gallery') loadGallery();
   else if (name === 'testimonials') loadTestimonials();
-  else if (name === 'blog') loadBlogPosts();
-  else if (name === 'payments') { loadPaymentSettings(); loadPaymentTransactions(); }
   else if (name === 'settings') loadSettings();
 }
 
@@ -471,26 +448,6 @@ function openPackageForm(pkg = null) {
       </div>
 
       <div class="form-section">
-        <h4>Additional Gallery Photos</h4>
-        <p style="font-size:.8rem;color:var(--slate-500);margin:-.2rem 0 .7rem">Shown as a photo gallery on this trip's page, separate from the main card image above.</p>
-        ${pkg ? `
-          <div class="gallery-images-grid" id="pkg-gallery-grid">
-            ${(pkg.gallery_images || []).map(img => `
-              <div class="gallery-thumb">
-                <img src="/${esc(img)}" alt="">
-                <button type="button" onclick="deletePackageGalleryImage(${pkg.id}, '${esc(img).replace(/'/g, "\\'")}')" title="Remove"><i class="fa-solid fa-xmark"></i></button>
-              </div>
-            `).join('') || '<p style="font-size:.82rem;color:var(--slate-300)">No extra photos yet.</p>'}
-          </div>
-          <div class="upload-zone" id="pkg-gallery-zone" onclick="document.getElementById('pkg-gallery-input').click()">
-            <i class="fa-solid fa-images"></i>
-            <p>Click to add photos<br><small>Select multiple at once — uploads immediately</small></p>
-            <input type="file" id="pkg-gallery-input" accept="image/*" multiple>
-          </div>
-        ` : `<p style="font-size:.85rem;color:var(--slate-500)">Save this package first, then reopen it to add gallery photos.</p>`}
-      </div>
-
-      <div class="form-section">
         <button type="button" class="collapse-toggle" onclick="toggleCollapse('itin-body', this)">
           <i class="fa-solid fa-chevron-right"></i> Itinerary (${itin.length} days)
         </button>
@@ -585,37 +542,8 @@ function openPackageForm(pkg = null) {
     });
   });
 
-  // Additional gallery photos — uploads immediately on selection, separate
-  // from the main form (this package already exists, so there's a real ID
-  // to attach photos to right away rather than waiting for form submit).
-  const galleryInput = document.getElementById('pkg-gallery-input');
-  if (galleryInput && pkg) {
-    galleryInput.addEventListener('change', async function() {
-      if (!this.files.length) return;
-      const fd = new FormData();
-      Array.from(this.files).forEach(f => fd.append('images', f));
-      try {
-        await api('POST', `/api/packages/${pkg.id}/gallery`, fd, true);
-        toast('Photos added');
-        const fresh = await api('GET', `/api/packages/${pkg.slug}`);
-        openPackageForm(fresh); // reopen with the updated gallery list
-      } catch (ex) { toast('Error: ' + ex.message, true); }
-    });
-  }
-
   // Form submit
   document.getElementById('pkg-form').addEventListener('submit', savePackage);
-}
-
-async function deletePackageGalleryImage(packageId, imagePath) {
-  if (!confirm('Remove this photo from the gallery?')) return;
-  try {
-    await api('DELETE', `/api/packages/${packageId}/gallery`, { image_path: imagePath });
-    toast('Photo removed');
-    const pkg = allPackages.find(p => p.id === packageId);
-    const fresh = pkg ? await api('GET', `/api/packages/${pkg.slug}`) : null;
-    if (fresh) openPackageForm(fresh);
-  } catch (ex) { toast('Error: ' + ex.message, true); }
 }
 
 function itinDayHtml(i, title = '', content = '') {
@@ -1182,11 +1110,7 @@ function renderGalleryGrid() {
     <div class="gallery-admin-item">
       <img src="/${item.image_path}" alt="${esc(item.alt_text)}" loading="lazy">
       ${item.is_tall ? '<span class="tall-badge">TALL</span>' : ''}
-      ${item.location ? `<span class="location-badge"><i class="fa-solid fa-location-dot"></i> ${esc(item.location)}</span>` : ''}
       <div class="item-overlay">
-        <button class="overlay-btn" onclick="editGalleryItem(${item.id})" title="Edit alt text & location">
-          <i class="fa-solid fa-pen"></i>
-        </button>
         <button class="overlay-btn tall-toggle" onclick="toggleTall(${item.id}, ${item.is_tall})" title="${item.is_tall ? 'Remove tall' : 'Mark tall'}">
           <i class="fa-solid fa-up-down"></i>
         </button>
@@ -1196,42 +1120,6 @@ function renderGalleryGrid() {
       </div>
     </div>
   `).join('');
-}
-
-function editGalleryItem(id) {
-  const item = allGallery.find(g => g.id === id);
-  if (!item) return;
-  const html = `
-    <form id="gallery-edit-form">
-      <div class="field">
-        <label for="gal-edit-alt">Alt Text</label>
-        <input type="text" id="gal-edit-alt" value="${esc(item.alt_text || '')}" placeholder="Description of the photo">
-      </div>
-      <div class="field">
-        <label for="gal-edit-location">Location <span style="opacity:.6;font-weight:400;">(shown on hover on the homepage)</span></label>
-        <input type="text" id="gal-edit-location" value="${esc(item.location || '')}" placeholder="e.g. Anini, Arunachal Pradesh">
-      </div>
-      <div style="display:flex;gap:.75rem;margin-top:.5rem">
-        <button type="submit" class="btn-primary">Save</button>
-        <button type="button" class="btn-secondary" onclick="closeModal()">Cancel</button>
-      </div>
-    </form>
-  `;
-  openModal('Edit Photo', html);
-  document.getElementById('gallery-edit-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    try {
-      await api('PUT', `/api/gallery/${id}`, {
-        alt_text: document.getElementById('gal-edit-alt').value,
-        location: document.getElementById('gal-edit-location').value,
-        is_tall: item.is_tall ? 'true' : 'false',
-        display_order: item.display_order || 0
-      });
-      toast('Photo updated');
-      closeModal();
-      loadGallery();
-    } catch (ex) { toast('Error: ' + ex.message, true); }
-  });
 }
 
 function openGalleryUpload() {
@@ -1251,10 +1139,6 @@ function openGalleryUpload() {
       <div class="field">
         <label for="gal-alt">Alt Text (for accessibility & SEO)</label>
         <input type="text" id="gal-alt" value="Travel photo from Northeast India" placeholder="Description of the photo">
-      </div>
-      <div class="field">
-        <label for="gal-location">Location <span style="opacity:.6;font-weight:400;">(optional — shown on hover on the homepage; applies to every photo in this batch)</span></label>
-        <input type="text" id="gal-location" placeholder="e.g. Anini, Arunachal Pradesh">
       </div>
       <div style="display:flex;gap:.75rem;margin-top:.5rem">
         <button type="submit" class="btn-primary" id="gal-submit"><i class="fa-solid fa-upload"></i> Upload Photos</button>
@@ -1283,7 +1167,6 @@ function openGalleryUpload() {
     const fd = new FormData();
     Array.from(files).forEach(f => fd.append('images', f));
     fd.append('alt_text', document.getElementById('gal-alt').value);
-    fd.append('location', document.getElementById('gal-location').value);
 
     const btn = document.getElementById('gal-submit');
     btn.innerHTML = '<span class="spinner"></span> Uploading...';
@@ -1305,7 +1188,7 @@ function openGalleryUpload() {
 async function toggleTall(id, currentIsTall) {
   try {
     const item = allGallery.find(g => g.id === id);
-    await api('PUT', `/api/gallery/${id}`, { alt_text: item?.alt_text || '', location: item?.location || '', is_tall: currentIsTall ? 'false' : 'true', display_order: item?.display_order || 0 });
+    await api('PUT', `/api/gallery/${id}`, { alt_text: item?.alt_text || '', is_tall: currentIsTall ? 'false' : 'true', display_order: item?.display_order || 0 });
     loadGallery();
   } catch (ex) { toast('Error: ' + ex.message, true); }
 }
@@ -1467,226 +1350,6 @@ async function loadSettings() {
       if (el) el.value = v;
     });
   } catch (ex) { toast('Failed to load settings', true); }
-}
-
-// ─── BLOG ─────────────────────────────────────────────────────────────────────
-async function loadBlogPosts() {
-  try {
-    allBlogPosts = await api('GET', '/api/admin/blog');
-    renderBlogTable();
-  } catch (ex) { toast('Failed to load blog posts', true); }
-}
-
-function renderBlogTable() {
-  const tbody = document.getElementById('blog-tbody');
-  if (!allBlogPosts.length) {
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--slate-300)">No posts yet — write your first guide.</td></tr>';
-    return;
-  }
-  tbody.innerHTML = allBlogPosts.map(p => `
-    <tr>
-      <td><span class="status-pill ${p.status === 'published' ? 'approved' : 'pending'}">${esc(p.status)}</span></td>
-      <td><strong>${esc(p.title)}</strong></td>
-      <td style="font-size:.8rem;color:var(--slate-500)">${(p.tags || []).map(t => esc(t)).join(', ') || '–'}</td>
-      <td style="white-space:nowrap;font-size:.8rem;color:var(--slate-300)">${p.published_at ? fmtDate(p.published_at) : '–'}</td>
-      <td>
-        <div class="row-actions">
-          <button class="btn-edit" onclick="editBlogPost(${p.id})"><i class="fa-solid fa-pen"></i></button>
-          <a href="/blog-post.html?slug=${esc(p.slug)}" target="_blank" class="btn-edit" title="View live"><i class="fa-solid fa-eye"></i></a>
-          <button class="btn-delete" onclick="deleteBlogPost(${p.id}, '${esc(p.title).replace(/'/g, "\\'")}')"><i class="fa-solid fa-trash"></i></button>
-        </div>
-      </td>
-    </tr>
-  `).join('');
-}
-
-function openBlogForm(post = null) {
-  editingBlogId = post ? post.id : null;
-  const title = post ? 'Edit Post' : 'New Post';
-
-  const html = `
-    <form id="blog-form">
-      <div class="form-section">
-        <div class="field-row">
-          <div class="field">
-            <label for="blog-title">Title *</label>
-            <input id="blog-title" type="text" name="title" value="${esc(post?.title || '')}" required placeholder="e.g. Best Time to Visit Meghalaya">
-          </div>
-          <div class="field">
-            <label for="blog-slug">URL Slug *</label>
-            <input id="blog-slug" type="text" name="slug" value="${esc(post?.slug || '')}" required placeholder="e.g. best-time-to-visit-meghalaya">
-          </div>
-        </div>
-        <div class="field">
-          <label for="blog-excerpt">Excerpt</label>
-          <textarea id="blog-excerpt" name="excerpt" rows="2" placeholder="One or two sentences shown on the blog listing page">${esc(post?.excerpt || '')}</textarea>
-        </div>
-        <div class="field">
-          <label for="blog-tags">Tags (comma-separated)</label>
-          <input id="blog-tags" type="text" name="tags_raw" value="${(post?.tags || []).map(esc).join(', ')}" placeholder="Meghalaya, Planning, Best Time to Visit">
-        </div>
-        <div class="field">
-          <label for="blog-meta">Meta Description (for search engines)</label>
-          <input id="blog-meta" type="text" name="meta_description" value="${esc(post?.meta_description || '')}" placeholder="Shown under the title in Google search results">
-        </div>
-        <div class="field">
-          <label for="blog-status">Status</label>
-          <select id="blog-status" name="status">
-            <option value="draft" ${post?.status !== 'published' ? 'selected' : ''}>Draft</option>
-            <option value="published" ${post?.status === 'published' ? 'selected' : ''}>Published</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="form-section">
-        <h4>Cover Image</h4>
-        ${post?.cover_image ? `<div class="current-image-wrap"><img src="/${esc(post.cover_image)}" alt="Current cover"></div>` : ''}
-        <div class="upload-zone" id="blog-img-zone" onclick="document.getElementById('blog-img-input').click()">
-          <i class="fa-solid fa-cloud-arrow-up"></i>
-          <p>${post?.cover_image ? 'Click to replace image' : 'Click to upload image'}<br><small>JPG, PNG, WebP — max 15MB</small></p>
-          <input type="file" id="blog-img-input" accept="image/*">
-        </div>
-        <div class="image-preview" id="blog-img-preview"></div>
-        <input type="hidden" name="existing_cover_image" value="${esc(post?.cover_image || '')}">
-      </div>
-
-      <div class="form-section">
-        <h4>Content</h4>
-        <p style="font-size:.8rem;color:var(--slate-500);margin:-.2rem 0 .7rem">
-          Simple formatting: start a line with <code>## </code> for a heading, leave a blank line between paragraphs,
-          use <code>**text**</code> for bold, and <code>- </code> at the start of a line for a bullet list.
-        </p>
-        <textarea id="blog-content" name="content" rows="16" placeholder="Write the full article here...">${esc(post?.content || '')}</textarea>
-      </div>
-
-      <div style="display:flex;gap:.75rem;margin-top:1rem">
-        <button type="submit" class="btn-primary"><i class="fa-solid fa-floppy-disk"></i> ${post ? 'Save Changes' : 'Create Post'}</button>
-        <button type="button" class="btn-secondary" onclick="closeModal()">Cancel</button>
-      </div>
-    </form>
-  `;
-
-  openModal(title, html);
-
-  // Slug auto-fill from title, only while creating a new post
-  document.getElementById('blog-title').addEventListener('input', (e) => {
-    if (!editingBlogId) {
-      document.getElementById('blog-slug').value =
-        e.target.value.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-    }
-  });
-
-  // Cover image preview
-  document.getElementById('blog-img-input').addEventListener('change', function() {
-    const preview = document.getElementById('blog-img-preview');
-    preview.innerHTML = '';
-    Array.from(this.files).forEach(f => {
-      const img = document.createElement('img');
-      img.src = URL.createObjectURL(f);
-      preview.appendChild(img);
-    });
-  });
-
-  document.getElementById('blog-form').addEventListener('submit', saveBlogPost);
-}
-
-async function saveBlogPost(e) {
-  e.preventDefault();
-  const form = e.target;
-  const fd = new FormData(form);
-
-  // Tags come in as a single comma-separated text field — convert to the
-  // JSON array format the backend expects (same convention as inclusions/
-  // exclusions/highlights on the package form).
-  const tagsRaw = fd.get('tags_raw') || '';
-  fd.delete('tags_raw');
-  fd.append('tags', JSON.stringify(tagsRaw.split(',').map(t => t.trim()).filter(Boolean)));
-
-  const imgInput = document.getElementById('blog-img-input');
-  if (imgInput.files[0]) fd.append('cover_image', imgInput.files[0]);
-
-  try {
-    if (editingBlogId) {
-      await api('PUT', `/api/blog/${editingBlogId}`, fd, true);
-      toast('Post updated!');
-    } else {
-      await api('POST', '/api/blog', fd, true);
-      toast('Post created!');
-    }
-    closeModal();
-    loadBlogPosts();
-  } catch (ex) { toast('Error: ' + ex.message, true); }
-}
-
-function editBlogPost(id) {
-  const post = allBlogPosts.find(p => p.id === id);
-  if (post) openBlogForm(post);
-}
-
-async function deleteBlogPost(id, title) {
-  if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
-  try {
-    await api('DELETE', `/api/blog/${id}`);
-    toast('Post deleted');
-    loadBlogPosts();
-  } catch (ex) { toast('Error: ' + ex.message, true); }
-}
-
-// ─── PAYMENTS ─────────────────────────────────────────────────────────────────
-async function loadPaymentSettings() {
-  try {
-    // /api/admin/settings (not the public one) — includes payment fields,
-    // with the Razorpay secret masked rather than sent as plaintext.
-    const settings = await api('GET', '/api/admin/settings');
-    const form = document.getElementById('payments-form');
-    ['upi_id', 'upi_payee_name', 'razorpay_key_id', 'razorpay_key_secret'].forEach(k => {
-      const el = form.querySelector(`[name="${k}"]`);
-      if (el && settings[k] !== undefined) el.value = settings[k];
-    });
-    form.querySelector('#fld-payments_upi_enabled').checked = settings.payments_upi_enabled === 'true';
-    form.querySelector('#fld-payments_card_enabled').checked = settings.payments_card_enabled === 'true';
-  } catch (ex) { toast('Failed to load payment settings', true); }
-}
-
-async function loadPaymentTransactions() {
-  try {
-    allPayments = await api('GET', '/api/admin/payments');
-    renderPaymentsTable();
-  } catch (ex) { toast('Failed to load transactions', true); }
-}
-
-function renderPaymentsTable() {
-  const tbody = document.getElementById('payments-tbody');
-  if (!allPayments.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--slate-300)">No payment attempts yet.</td></tr>';
-    return;
-  }
-  const methodLabel = { razorpay: 'Card/Online', upi_manual: 'UPI' };
-  tbody.innerHTML = allPayments.map(p => `
-    <tr>
-      <td><span class="status-pill ${esc(p.status)}">${esc(p.status)}</span></td>
-      <td>${esc(methodLabel[p.method] || p.method)}</td>
-      <td><strong>₹${Number(p.amount).toLocaleString('en-IN')}</strong></td>
-      <td>${esc(p.name || '–')}</td>
-      <td style="font-size:.82rem">${esc(p.phone || '–')}</td>
-      <td style="font-size:.8rem;color:var(--slate-300);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.note || '–')}</td>
-      <td style="white-space:nowrap;font-size:.8rem;color:var(--slate-300)">${fmtDate(p.created_at)}</td>
-      <td>
-        <div class="row-actions">
-          ${p.method === 'upi_manual' && p.status !== 'paid' ? `<button class="btn-edit" onclick="setPaymentStatus(${p.id}, 'paid')" title="Confirm you received this in your UPI app"><i class="fa-solid fa-check"></i> Mark Paid</button>` : ''}
-          ${p.status !== 'failed' ? `<button class="btn-secondary" onclick="setPaymentStatus(${p.id}, 'failed')">Mark Failed</button>` : ''}
-        </div>
-      </td>
-    </tr>
-  `).join('');
-}
-
-async function setPaymentStatus(id, status) {
-  try {
-    await api('PATCH', `/api/admin/payments/${id}/status`, { status });
-    toast('Transaction updated');
-    loadPaymentTransactions();
-  } catch (ex) { toast('Error: ' + ex.message, true); }
 }
 
 // ─── Utility ──────────────────────────────────────────────────────────────────
