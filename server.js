@@ -10,6 +10,7 @@ const { sendBookingConfirmedEmail } = require('./lib/mailer');
 const app = express();
 const PORT = process.env.PORT || 5000;
 app.set('trust proxy', 1);
+app.disable('x-powered-by'); // Don't advertise the framework/version to every visitor.
 
 // Ensure uploads directory exists
 // DATA_DIR lets production hosts (Render, Railway, etc.) point uploads at a
@@ -40,7 +41,7 @@ app.use((req, res, next) => {
 // explicitly deny it first — critically the SQLite database (customer PII +
 // the admin's password hash), the server source, and deploy/config files.
 const DENIED_PATHS = [
-  '/db', '/server.js', '/package.json', '/package-lock.json',
+  '/db', '/lib', '/server.js', '/package.json', '/package-lock.json',
   '/.replit', '/replit.nix', '/replit.md', '/.env', '/.git', '/node_modules'
 ];
 app.use((req, res, next) => {
@@ -167,6 +168,19 @@ setInterval(() => {
     if (now - entry.firstAttempt > LOGIN_WINDOW_MS) loginAttempts.delete(ip);
   }
 }, LOGIN_WINDOW_MS).unref();
+
+// The booking/enquiry/testimonial submit throttles below (per-IP timestamp
+// maps) get one entry per unique visitor IP forever otherwise — harmless at
+// this app's scale in the short term, but an unbounded, ever-growing map is
+// exactly the kind of thing that turns into a slow memory leak on a
+// long-running production process. Sweep anything older than an hour.
+const SUBMIT_THROTTLE_SWEEP_MS = 60 * 60 * 1000;
+function sweepTimestampMap(map, maxAgeMs) {
+  const now = Date.now();
+  for (const [ip, ts] of map) {
+    if (now - ts > maxAgeMs) map.delete(ip);
+  }
+}
 
 // ─── Auth routes ───────────────────────────────────────────────────────────────
 
@@ -726,9 +740,63 @@ app.put('/api/settings', requireAuth, (req, res) => {
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'admin', 'index.html')));
 app.get('/admin/', (req, res) => res.sendFile(path.join(__dirname, 'admin', 'index.html')));
 
+// ─── Unmatched API routes → JSON 404 ───────────────────────────────────────────
+// Anything under /api/ that didn't match a route above is a genuine "not
+// found," not a static file — respond with JSON instead of falling through
+// to Express's default HTML 404 page, which every API consumer here (the
+// frontend's fetch calls, admin.js) has to otherwise handle as a parse error.
+app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
+
+// ─── Centralized error handler ─────────────────────────────────────────────────
+// Catches anything passed to next(err) — malformed JSON bodies, Multer
+// upload errors (oversized file, disallowed type), and any other thrown
+// error a route handler didn't already catch itself. Must be defined last,
+// with all four arguments, or Express won't treat it as an error handler.
+// Without this, an uncaught error here falls through to Express's own
+// default handler, which in non-production mode renders the full stack
+// trace straight into the HTTP response — exactly the "leak stack traces to
+// users" failure Phase 5 asks to rule out.
+app.use((err, req, res, next) => {
+  console.error('[unhandled]', err);
+  if (err instanceof multer.MulterError || /Only image files are allowed/.test(err.message || '')) {
+    return res.status(400).json({ error: err.message });
+  }
+  if (err.type === 'entity.parse.failed') {
+    return res.status(400).json({ error: 'Malformed request body' });
+  }
+  res.status(500).json({ error: 'Something went wrong on our end. Please try again.' });
+});
+
 // ─── Start ────────────────────────────────────────────────────────────────────
 
-app.listen(PORT, '0.0.0.0', () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`Touring Buddiez running on port ${PORT}`);
   console.log(`Admin panel: http://localhost:${PORT}/admin`);
 });
+
+// Sweep the per-IP submission-throttle maps hourly so a long-running
+// process doesn't slowly accumulate one entry per visitor IP forever.
+setInterval(() => {
+  sweepTimestampMap(bookingSubmitTimestamps, SUBMIT_THROTTLE_SWEEP_MS);
+  sweepTimestampMap(enquirySubmitTimestamps, SUBMIT_THROTTLE_SWEEP_MS);
+  sweepTimestampMap(testimonialSubmitTimestamps, SUBMIT_THROTTLE_SWEEP_MS);
+}, SUBMIT_THROTTLE_SWEEP_MS).unref();
+
+// ─── Graceful shutdown ──────────────────────────────────────────────────────────
+// Render (and most hosts) send SIGTERM before killing a container on every
+// redeploy or restart. Without handling it, in-flight requests get cut off
+// mid-response and the SQLite connection is torn down mid-write instead of
+// checkpointing its WAL file cleanly. Stop taking new connections first,
+// let existing ones finish, then close the database.
+function gracefulShutdown(signal) {
+  console.log(`\n${signal} received: closing server gracefully...`);
+  server.close(() => {
+    try { db.close(); } catch (e) { /* already closed */ }
+    console.log('Server closed. Goodbye.');
+    process.exit(0);
+  });
+  // Don't hang forever if a connection never closes on its own.
+  setTimeout(() => process.exit(1), 10000).unref();
+}
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));

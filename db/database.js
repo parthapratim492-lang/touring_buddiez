@@ -9,6 +9,50 @@ const fs = require('fs');
 const DATA_DIR = process.env.DATA_DIR || __dirname;
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 const DB_PATH = path.join(DATA_DIR, 'touring_buddiez.db');
+
+// ─── Startup integrity check ───────────────────────────────────────────────────
+// A malformed SQLite file crashes the very first PRAGMA call in the old
+// code (`journal_mode = WAL`), which means the process exits nonzero,
+// Render restarts it, it crashes again — an infinite, silent crash loop
+// with the service permanently down and no way for it to recover on its
+// own. This checks the file in isolation *before* opening the real
+// connection, and if it's genuinely unreadable, moves it aside (renamed,
+// never deleted) and lets the schema/seed step below build a fresh
+// database, so the site comes back online instead of crash-looping
+// forever. The corrupt file and its WAL/SHM siblings are preserved next to
+// it with a timestamp, in case they're recoverable later (e.g. via the
+// sqlite3 CLI's `.recover` command from a Render Shell session).
+function quarantineIfCorrupt(dbPath) {
+  if (!fs.existsSync(dbPath)) return; // nothing to check — a fresh DB will be created normally
+  let healthy = false;
+  try {
+    const probe = new Database(dbPath, { readonly: true, fileMustExist: true });
+    const result = probe.pragma('integrity_check');
+    probe.close();
+    healthy = Array.isArray(result) && result.length === 1 && result[0].integrity_check === 'ok';
+  } catch (err) {
+    healthy = false;
+  }
+  if (healthy) return;
+
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  console.error(
+    `[db] FATAL: ${dbPath} failed its integrity check on startup (this is what was ` +
+    `crashing the deploy). Preserving it as *.corrupt-${stamp} rather than deleting it, ` +
+    `and starting a fresh database so the site can come back online. If you need to ` +
+    `recover data from the corrupt file, open a Render Shell and inspect ` +
+    `"${dbPath}.corrupt-${stamp}" with the sqlite3 CLI's ".recover" command.`
+  );
+  [dbPath, `${dbPath}-wal`, `${dbPath}-shm`].forEach((p) => {
+    if (fs.existsSync(p)) {
+      try { fs.renameSync(p, `${p}.corrupt-${stamp}`); }
+      catch (e) { console.error(`[db] Could not move aside ${p}:`, e.message); }
+    }
+  });
+}
+
+quarantineIfCorrupt(DB_PATH);
+
 const db = new Database(DB_PATH);
 
 // Enable WAL mode for better performance
@@ -114,6 +158,8 @@ db.exec(`
     reason TEXT,
     created_at TEXT DEFAULT (datetime('now'))
   );
+
+  CREATE INDEX IF NOT EXISTS idx_availability_slug ON availability(package_slug);
 `);
 
 // ─── Lightweight migration (for DBs created before status/email/created_at existed) ──
@@ -647,5 +693,9 @@ module.exports = {
       mostBookedPackage: mostBookedPackage ? mostBookedPackage.package_name : null,
       bookingsByDay, packagePopularity, recentActivity
     };
-  }
+  },
+
+  // Exposed so server.js can checkpoint WAL and close the file handle
+  // cleanly on shutdown, instead of leaving the process to be killed mid-write.
+  close: () => db.close()
 };
