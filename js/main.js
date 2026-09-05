@@ -84,10 +84,6 @@
 
   /* ---------------------------------------------------------------------
      3. CUSTOM CURSOR (desktop only)
-     States: small dot by default, a soft ring over any link/button, and a
-     text label — VIEW over editorial images, OPEN over the gallery — so the
-     cursor itself tells you what a hover does instead of relying on a
-     regular pointer.
   --------------------------------------------------------------------- */
   function initCursor() {
     if (isTouch || reduceMotion) return;
@@ -104,31 +100,12 @@
       requestAnimationFrame(raf);
     })();
 
-    const setLabel = (text) => {
-      dot.textContent = text || "";
-      dot.classList.toggle("is-label", Boolean(text));
-    };
-
     const hoverables = "a, button, .tilt, input, textarea, select";
     document.addEventListener("mouseover", (e) => {
-      const gallery = e.target.closest(".g-item");
-      const zoom = e.target.closest(".media-zoom");
-      if (gallery) {
-        setLabel("OPEN");
-        dot.classList.add("is-hover");
-      } else if (zoom) {
-        setLabel("VIEW");
-        dot.classList.add("is-hover");
-      } else if (e.target.closest(hoverables)) {
-        setLabel("");
-        dot.classList.add("is-hover");
-      }
+      if (e.target.closest(hoverables)) dot.classList.add("is-hover");
     });
     document.addEventListener("mouseout", (e) => {
-      if (e.target.closest(".g-item, .media-zoom, " + hoverables)) {
-        dot.classList.remove("is-hover");
-        setLabel("");
-      }
+      if (e.target.closest(hoverables)) dot.classList.remove("is-hover");
     });
   }
 
@@ -172,70 +149,6 @@
   }
 
   window.__reinitReveals = observeReveals;
-
-  /* ---------------------------------------------------------------------
-     4b. MASKED HEADLINE REVEAL
-     Wraps each line of the hero h1 and every section h2 in an
-     overflow-hidden mask, then slides the text up from underneath on
-     scroll — a "curtain rising" reveal instead of a plain fade, reserved
-     for headlines since spec calls for this on the most important text
-     only. Runs once; safe to no-op on a second call.
-  --------------------------------------------------------------------- */
-  let maskObserver = null;
-
-  function initMaskReveal() {
-    const heads = document.querySelectorAll(".hero h1, .section-head h2");
-    if (!heads.length) return;
-
-    heads.forEach((h) => {
-      if (h.dataset.maskBound) return;
-      const lines = h.innerHTML.split(/<br\s*\/?>/i);
-      h.innerHTML = lines
-        .map((line) => `<span class="mask-line"><span class="mask-inner">${line}</span></span>`)
-        .join("");
-      h.classList.add("has-mask");
-      h.dataset.maskBound = "1";
-    });
-
-    if (reduceMotion) {
-      heads.forEach((h) => h.classList.add("is-visible"));
-      return;
-    }
-
-    if (!maskObserver) {
-      maskObserver = new IntersectionObserver(
-        (entries, o) => {
-          entries.forEach((entry) => {
-            if (entry.isIntersecting) {
-              entry.target.classList.add("is-visible");
-              o.unobserve(entry.target);
-            }
-          });
-        },
-        { threshold: 0.4 }
-      );
-    }
-    heads.forEach((h) => maskObserver.observe(h));
-  }
-
-  /* ---------------------------------------------------------------------
-     4c. MAGNETIC BUTTONS
-     Primary CTAs drift a few px toward the cursor as it approaches, then
-     ease back on leave — restrained (max 6px) per spec, desktop only.
-  --------------------------------------------------------------------- */
-  function initMagnetic() {
-    if (isTouch || reduceMotion) return;
-    document.querySelectorAll(".btn-primary").forEach((btn) => {
-      const strength = 6;
-      btn.addEventListener("mousemove", (e) => {
-        const r = btn.getBoundingClientRect();
-        const px = (e.clientX - r.left) / r.width - 0.5;
-        const py = (e.clientY - r.top) / r.height - 0.5;
-        btn.style.transform = `translate(${px * strength}px, ${py * strength - 2}px)`;
-      });
-      btn.addEventListener("mouseleave", () => { btn.style.transform = ""; });
-    });
-  }
 
   /* ---------------------------------------------------------------------
      5. STAT COUNTERS
@@ -358,6 +271,49 @@
     );
   }
 
+  /* ---------------------------------------------------------------------
+     8d. WINTER FEST COUNTDOWN — ticks down to event_end_date (end of day).
+     Once that date has passed, swaps the countdown for "Event Completed"
+     instead of showing negative numbers or a frozen zero. Exposed on
+     window so site-data.js can start it once settings have loaded.
+  --------------------------------------------------------------------- */
+  let festTimerId = null;
+  function initFestCountdown(endDateStr) {
+    const countdownEl = document.getElementById('fest-countdown');
+    const completedEl = document.getElementById('fest-completed');
+    if (!countdownEl || !completedEl) return;
+
+    const endOfEventDay = new Date(endDateStr + 'T23:59:59');
+
+    function tick() {
+      const diff = endOfEventDay.getTime() - Date.now();
+      if (diff <= 0) {
+        countdownEl.style.display = 'none';
+        completedEl.style.display = 'flex';
+        if (festTimerId) clearInterval(festTimerId);
+        return;
+      }
+      const d = Math.floor(diff / 86400000);
+      const h = Math.floor((diff % 86400000) / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      const pad = (n) => String(n).padStart(2, '0');
+      const daysEl = document.getElementById('fc-days');
+      const hoursEl = document.getElementById('fc-hours');
+      const minsEl = document.getElementById('fc-mins');
+      const secsEl = document.getElementById('fc-secs');
+      if (daysEl) daysEl.textContent = pad(d);
+      if (hoursEl) hoursEl.textContent = pad(h);
+      if (minsEl) minsEl.textContent = pad(m);
+      if (secsEl) secsEl.textContent = pad(s);
+    }
+
+    tick();
+    if (festTimerId) clearInterval(festTimerId);
+    festTimerId = setInterval(tick, 1000);
+  }
+  window.__initFestCountdown = initFestCountdown;
+
   function initHeroVideo() {
     const media = document.getElementById("hero-media");
     if (!media) return;
@@ -396,75 +352,29 @@
 
   /* ---------------------------------------------------------------------
      9. GALLERY LIGHTBOX
-     Uses event delegation on .gallery-grid (not per-item listeners) since
-     the grid's actual photos are re-rendered from the API after load (see
-     site-data.js) — binding directly to the items present at DOMContentLoaded
-     would silently stop working the moment real gallery data arrives.
-     Supports Escape, ←/→ between photos, and returns focus to whichever
-     thumbnail opened it.
   --------------------------------------------------------------------- */
   function initLightbox() {
-    const grid = document.querySelector(".gallery-grid");
+    const items = document.querySelectorAll(".g-item");
     const lightbox = document.querySelector(".lightbox");
-    if (!grid || !lightbox) return;
-
+    if (!items.length || !lightbox) return;
     const img = lightbox.querySelector("img");
-    const closeBtn = lightbox.querySelector(".lightbox-close");
-    const prevBtn = lightbox.querySelector(".lightbox-prev");
-    const nextBtn = lightbox.querySelector(".lightbox-next");
-    let items = [];
-    let index = 0;
-    let lastFocused = null;
+    const close = lightbox.querySelector(".lightbox-close");
 
-    const show = (i) => {
-      items = [...grid.querySelectorAll(".g-item img")];
-      if (!items.length) return;
-      index = (i + items.length) % items.length;
-      img.src = items[index].src;
-      img.alt = items[index].alt;
-    };
-
-    const open = (i, triggerEl) => {
-      lastFocused = triggerEl || document.activeElement;
-      show(i);
-      lightbox.classList.add("is-open");
-      lightbox.setAttribute("aria-hidden", "false");
-      document.body.classList.add("no-scroll");
-      closeBtn.focus();
-    };
-    const close = () => {
+    items.forEach((item) => {
+      item.addEventListener("click", () => {
+        img.src = item.querySelector("img").src;
+        img.alt = item.querySelector("img").alt;
+        lightbox.classList.add("is-open");
+        document.body.classList.add("no-scroll");
+      });
+    });
+    const closeFn = () => {
       lightbox.classList.remove("is-open");
-      lightbox.setAttribute("aria-hidden", "true");
       document.body.classList.remove("no-scroll");
-      if (lastFocused && lastFocused.focus) lastFocused.focus();
     };
-
-    grid.addEventListener("click", (e) => {
-      const item = e.target.closest(".g-item");
-      if (!item) return;
-      const all = [...grid.querySelectorAll(".g-item")];
-      open(all.indexOf(item), item);
-    });
-
-    closeBtn.addEventListener("click", close);
-    prevBtn.addEventListener("click", () => show(index - 1));
-    nextBtn.addEventListener("click", () => show(index + 1));
-    lightbox.addEventListener("click", (e) => { if (e.target === lightbox) close(); });
-
-    document.addEventListener("keydown", (e) => {
-      if (!lightbox.classList.contains("is-open")) return;
-      if (e.key === "Escape") close();
-      else if (e.key === "ArrowLeft") show(index - 1);
-      else if (e.key === "ArrowRight") show(index + 1);
-      else if (e.key === "Tab") {
-        // Simple focus trap: only three focusable controls in the lightbox.
-        const focusable = [prevBtn, closeBtn, nextBtn];
-        const i = focusable.indexOf(document.activeElement);
-        e.preventDefault();
-        const next = e.shiftKey ? (i - 1 + focusable.length) % focusable.length : (i + 1) % focusable.length;
-        focusable[next].focus();
-      }
-    });
+    close.addEventListener("click", closeFn);
+    lightbox.addEventListener("click", (e) => { if (e.target === lightbox) closeFn(); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeFn(); });
   }
 
   /* ---------------------------------------------------------------------
@@ -694,11 +604,9 @@
     initNav();
     initCursor();
     initReveal();
-    initMaskReveal();
     initCounters();
     initTilt();
     initRipple();
-    initMagnetic();
     initParallax();
     initAboutParallax();
     initHeroVideo();

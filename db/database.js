@@ -9,50 +9,6 @@ const fs = require('fs');
 const DATA_DIR = process.env.DATA_DIR || __dirname;
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 const DB_PATH = path.join(DATA_DIR, 'touring_buddiez.db');
-
-// ─── Startup integrity check ───────────────────────────────────────────────────
-// A malformed SQLite file crashes the very first PRAGMA call in the old
-// code (`journal_mode = WAL`), which means the process exits nonzero,
-// Render restarts it, it crashes again — an infinite, silent crash loop
-// with the service permanently down and no way for it to recover on its
-// own. This checks the file in isolation *before* opening the real
-// connection, and if it's genuinely unreadable, moves it aside (renamed,
-// never deleted) and lets the schema/seed step below build a fresh
-// database, so the site comes back online instead of crash-looping
-// forever. The corrupt file and its WAL/SHM siblings are preserved next to
-// it with a timestamp, in case they're recoverable later (e.g. via the
-// sqlite3 CLI's `.recover` command from a Render Shell session).
-function quarantineIfCorrupt(dbPath) {
-  if (!fs.existsSync(dbPath)) return; // nothing to check — a fresh DB will be created normally
-  let healthy = false;
-  try {
-    const probe = new Database(dbPath, { readonly: true, fileMustExist: true });
-    const result = probe.pragma('integrity_check');
-    probe.close();
-    healthy = Array.isArray(result) && result.length === 1 && result[0].integrity_check === 'ok';
-  } catch (err) {
-    healthy = false;
-  }
-  if (healthy) return;
-
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  console.error(
-    `[db] FATAL: ${dbPath} failed its integrity check on startup (this is what was ` +
-    `crashing the deploy). Preserving it as *.corrupt-${stamp} rather than deleting it, ` +
-    `and starting a fresh database so the site can come back online. If you need to ` +
-    `recover data from the corrupt file, open a Render Shell and inspect ` +
-    `"${dbPath}.corrupt-${stamp}" with the sqlite3 CLI's ".recover" command.`
-  );
-  [dbPath, `${dbPath}-wal`, `${dbPath}-shm`].forEach((p) => {
-    if (fs.existsSync(p)) {
-      try { fs.renameSync(p, `${p}.corrupt-${stamp}`); }
-      catch (e) { console.error(`[db] Could not move aside ${p}:`, e.message); }
-    }
-  });
-}
-
-quarantineIfCorrupt(DB_PATH);
-
 const db = new Database(DB_PATH);
 
 // Enable WAL mode for better performance
@@ -158,8 +114,6 @@ db.exec(`
     reason TEXT,
     created_at TEXT DEFAULT (datetime('now'))
   );
-
-  CREATE INDEX IF NOT EXISTS idx_availability_slug ON availability(package_slug);
 `);
 
 // ─── Lightweight migration (for DBs created before status/email/created_at existed) ──
@@ -524,6 +478,142 @@ function seed() {
 
 seed();
 
+// ─── Content migration: 3 new packages + 2 new rental vehicles ──────────
+// Runs on every boot, but is idempotent — each insert is guarded by a
+// slug/name lookup, so it only adds rows that don't already exist. This
+// is deliberately separate from seed() above, which only ever runs once
+// against a brand-new empty database and would never reach an
+// already-seeded production database like the live site's.
+function migrateNewContent() {
+  const insertPkg = db.prepare(`
+    INSERT INTO packages (slug, name, route, duration, group_size, vehicle, price, image_path, description, itinerary, inclusions, exclusions, highlights, route_stops, featured, display_order)
+    VALUES (@slug, @name, @route, @duration, @group_size, @vehicle, @price, @image_path, @description, @itinerary, @inclusions, @exclusions, @highlights, @route_stops, @featured, @display_order)
+  `);
+  const hasPkg = (slug) => db.prepare('SELECT id FROM packages WHERE slug = ?').get(slug);
+
+  const newPackages = [
+    {
+      slug: 'anini-adventure',
+      name: 'Anini Adventure Package',
+      route: 'Guwahati · Dibrugarh · Mayodia Pass · Anini',
+      duration: '5D / 4N',
+      group_size: null,
+      vehicle: null,
+      price: '₹16,999 onwards',
+      image_path: 'assets/destinations/anini.jpg',
+      description: 'An offbeat adventure into the remote and breathtaking Dibang Valley — over Mayodia Pass and through Mishmi villages to Anini, one of the least-visited corners of Arunachal Pradesh. Pickup and drop in Guwahati. Customizable and extendable.',
+      itinerary: JSON.stringify([
+        { day: 1, title: 'Guwahati to Dibrugarh', content: 'Pickup from Guwahati airport/station, drive through the Brahmaputra Valley past tea gardens and local villages, arrive in Dibrugarh by evening.' },
+        { day: 2, title: 'Dibrugarh to Anini via Mayodia Pass', content: 'Early departure, cross the Dibang River, ascend to Mayodia Pass, descend through Mishmi tribal villages, reach Anini by evening.' },
+        { day: 3, title: "Anini Sightseeing — Nature's Masterpiece", content: 'Scenic drive on Bruni Road, Chigu Camp by the riverside, Roaring Matu Waterfall, Hidden Mawu Waterfall, and views over the Dri River Valley.' },
+        { day: 4, title: 'Anini to Dibrugarh', content: 'Mountain descent, valley views, overnight stay in Dibrugarh.' },
+        { day: 5, title: 'Dibrugarh to Guwahati', content: 'Morning checkout and the final drive back to Guwahati, with onward flight connections.' }
+      ]),
+      inclusions: JSON.stringify(['Private vehicle', 'Expert driver allowance', 'Stays', 'Sightseeing', 'Inner Line Permit']),
+      exclusions: JSON.stringify(['Meals & personal expenses', 'Anything not listed in inclusions']),
+      highlights: JSON.stringify(['Mayodia Pass', 'Mishmi tribal villages', 'Roaring Matu Waterfall', 'Hidden Mawu Waterfall', 'Dri River Valley views']),
+      route_stops: JSON.stringify([
+        { day: 1, name: 'Guwahati (Pickup)', lat: 26.1445, lng: 91.7362, note: 'Airport / railway station pickup.' },
+        { day: 1, name: 'Dibrugarh', lat: 27.4728, lng: 94.9120, note: 'Overnight stay.' },
+        { day: 2, name: 'Mayodia Pass', lat: 28.4642, lng: 95.9376, note: '~8,000+ ft — panoramic photography stops.' },
+        { day: 2, name: 'Anini', lat: 28.8167, lng: 95.8167, note: 'Dibang Valley — check-in.' }
+      ]),
+      featured: 1, display_order: 100
+    },
+    {
+      slug: 'dong-tilam-kibithoo-kaho',
+      name: 'Dong — Hidden Paradise of Arunachal',
+      route: 'Guwahati · Dong · Tilam · Kibithoo · Kaho',
+      duration: '5D / 4N',
+      group_size: null,
+      vehicle: null,
+      price: '₹15,999 onwards / person',
+      image_path: 'assets/destinations/dong.jpg',
+      description: "Explore the hidden paradise of Eastern Arunachal Pradesh — Dong's sunrise, Tilam's hot spring, and India's last villages at Kibithoo and Kaho. Travel with a local, experience the real Northeast.",
+      itinerary: JSON.stringify([
+        { day: 1, title: 'Guwahati to Dong', content: 'Journey into Eastern Arunachal Pradesh toward Dong Valley.' },
+        { day: 2, title: 'Dong Valley Sunrise', content: 'Among the first places in India to see the sunrise.' },
+        { day: 3, title: 'Tilam', content: "Visit Tilam's hot water spring." },
+        { day: 4, title: 'Kibithoo & Kaho', content: "Kibithoo — India's last village — and Kaho, the heavenly village, past Kibithu." },
+        { day: 5, title: 'Return to Guwahati', content: 'Drive back to Guwahati.' }
+      ]),
+      inclusions: JSON.stringify(['Transportation', 'Stays', 'Food', 'Entry fees', 'Guide', 'Inner Line Permits']),
+      exclusions: JSON.stringify(['Personal expenses', 'Anything not listed in inclusions']),
+      highlights: JSON.stringify(['Dong Valley Sunrise', 'Tilam Hot Water Spring', "Kibithoo — India's Last Village", 'Kaho — The Heavenly Village']),
+      route_stops: JSON.stringify([
+        { day: 1, name: 'Guwahati (Pickup)', lat: 26.1445, lng: 91.7362, note: 'Start of the journey.' },
+        { day: 2, name: 'Dong', lat: 28.15, lng: 97.05, note: 'Sunrise point.' },
+        { day: 3, name: 'Tilam', lat: 28.16, lng: 97.02, note: 'Hot water spring.' },
+        { day: 4, name: 'Kibithoo', lat: 29.15, lng: 97.43, note: "India's last village." },
+        { day: 4, name: 'Kaho', lat: 29.17, lng: 97.45, note: 'The heavenly village.' }
+      ]),
+      featured: 1, display_order: 110
+    },
+    {
+      slug: 'gongkar-la-lake',
+      name: 'Gongkar La Lake',
+      route: 'Mago · Chuna Valley · Gongkar La',
+      duration: '3D / 2N',
+      group_size: null,
+      vehicle: null,
+      price: '₹7,999',
+      image_path: 'assets/hero/poster.jpg',
+      description: 'A high-altitude Arunachal adventure around Gongkar La Lake, exploring Mago and Chuna Valley — scenic mountain landscapes and one of the region\'s least-visited alpine routes.',
+      itinerary: JSON.stringify([
+        { day: 1, title: 'Depart for Mago', content: 'Journey into the Mago region of Arunachal Pradesh.' },
+        { day: 2, title: 'Chuna Valley & Gongkar La Lake', content: 'Explore Chuna Valley and visit Gongkar La Lake.' },
+        { day: 3, title: 'Return Journey', content: 'Drive back, journey ends.' }
+      ]),
+      inclusions: JSON.stringify([]),
+      exclusions: JSON.stringify([]),
+      highlights: JSON.stringify(['Mago', 'Chuna Valley', 'Gongkar La Lake', 'High-altitude photography']),
+      route_stops: JSON.stringify([
+        { day: 1, name: 'Mago', lat: 27.83, lng: 91.60, note: 'Remote Tawang district village.' },
+        { day: 2, name: 'Chuna Valley', lat: 27.85, lng: 91.62, note: '' },
+        { day: 2, name: 'Gongkar La Lake', lat: 27.87, lng: 91.65, note: 'High-altitude alpine lake.' }
+      ]),
+      featured: 1, display_order: 120
+    }
+  ];
+
+  for (const pkg of newPackages) {
+    if (!hasPkg(pkg.slug)) insertPkg.run(pkg);
+  }
+
+  // Rentals — new self-drive vehicles from the current promotional material
+  const insertRental = db.prepare(`
+    INSERT INTO rentals (name, seats, tags, image_path, whatsapp, display_order)
+    VALUES (@name, @seats, @tags, @image_path, @whatsapp, @display_order)
+  `);
+  const hasRental = (name) => db.prepare('SELECT id FROM rentals WHERE name = ?').get(name);
+
+  const newRentals = [
+    { name: 'Hyundai i20 N Line (Self-Drive)', seats: '5', tags: JSON.stringify([{ icon: 'fa-key', label: 'Self-drive' }, { icon: 'fa-car', label: 'Hatchback' }]), image_path: 'assets/rentals/i20-selfdrive.jpg', whatsapp: '919707386186', display_order: 5 },
+    { name: 'Mahindra Thar (Self-Drive)', seats: '4', tags: JSON.stringify([{ icon: 'fa-key', label: 'Self-drive' }, { icon: 'fa-mountain', label: 'Off-road SUV' }]), image_path: 'assets/rentals/thar-selfdrive.jpg', whatsapp: '919707386186', display_order: 6 }
+  ];
+
+  for (const r of newRentals) {
+    if (!hasRental(r.name)) insertRental.run(r);
+  }
+
+  // Winter Fest event defaults — only set if the admin hasn't configured
+  // these yet, so an already-live site's edits are never overwritten.
+  const hasSetting = (key) => db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
+  const setIfMissing = db.prepare('INSERT INTO settings (key, value) VALUES (?, ?)');
+  const eventDefaults = [
+    ['event_title', 'Anini Winter Fest 2026'],
+    ['event_theme', 'Music · Adventure · Culture'],
+    ['event_start_date', '2026-09-19'],
+    ['event_end_date', '2026-09-20'],
+    ['event_location', 'Anini, Dibang Valley, Arunachal Pradesh'],
+    ['event_description', 'A festival like no other, in the heart of the untamed Dibang Valley.']
+  ];
+  for (const [key, value] of eventDefaults) {
+    if (!hasSetting(key)) setIfMissing.run(key, value);
+  }
+}
+migrateNewContent();
+
 // ─── Query helpers ─────────────────────────────────────────────────────────────
 
 function parseJSON(row) {
@@ -693,9 +783,5 @@ module.exports = {
       mostBookedPackage: mostBookedPackage ? mostBookedPackage.package_name : null,
       bookingsByDay, packagePopularity, recentActivity
     };
-  },
-
-  // Exposed so server.js can checkpoint WAL and close the file handle
-  // cleanly on shutdown, instead of leaving the process to be killed mid-write.
-  close: () => db.close()
+  }
 };

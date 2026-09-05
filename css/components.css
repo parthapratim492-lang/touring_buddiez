@@ -119,15 +119,9 @@ h1,h2,h3,h4{ font-family: var(--font-display); line-height: var(--lh-tight); fon
   border: 1.5px solid var(--line-light);
 }
 .on-dark .btn-ghost{ border-color: var(--line-dark); color: var(--mist-050); }
-.btn-ghost:hover{ border-color: var(--brass-500); background: rgba(199,154,68,0.08); transform: translateY(-1px); }
+.btn-ghost:hover{ border-color: var(--brass-500); background: rgba(199,154,68,0.08); }
 
 .btn-sm{ padding: .8em 1.5em; font-size: var(--fs-xs); }
-
-/* Any arrow icon inside a button nudges forward on hover — used on "All
-   Packages", package cards, etc. Purely decorative, so it's skipped
-   automatically under prefers-reduced-motion via the global rule in tokens.css. */
-.btn i.fa-arrow-right{ display:inline-block; transition: transform var(--dur-fast) var(--ease-out); }
-.btn:hover i.fa-arrow-right{ transform: translateX(4px); }
 
 /* ripple element injected by JS */
 /* ── Floating instant-booking CTA ───────────────────────────────────────── */
@@ -202,7 +196,7 @@ h1,h2,h3,h4{ font-family: var(--font-display); line-height: var(--lh-tight); fon
   transition: transform var(--dur-slow) var(--ease-out), filter var(--dur-slow);
   transform: scale(1.001);
 }
-.media-zoom:hover img{ transform: scale(1.06); }
+.media-zoom:hover img{ transform: scale(1.09); }
 
 /* ---------- Glassmorphism -------------------------------------------------- */
 .glass{
@@ -391,22 +385,6 @@ h1,h2,h3,h4{ font-family: var(--font-display); line-height: var(--lh-tight); fon
 [data-reveal-delay="2"]{ transition-delay: 180ms; }
 [data-reveal-delay="3"]{ transition-delay: 270ms; }
 [data-reveal-delay="4"]{ transition-delay: 360ms; }
-
-/* ---------- Masked line reveal (headlines) --------------------------------------
-   Applied at runtime by initMaskReveal() in main.js to .hero h1 and every
-   .section-head h2 — each line sits in an overflow-hidden mask and slides up
-   from underneath, like a page turning, instead of a plain fade. Falls back
-   to a normal, fully-visible heading if JS never runs (progressive
-   enhancement — see the no-js guard below). */
-.mask-line{ display:block; overflow:hidden; }
-.has-mask .mask-inner{
-  display:block;
-  transform: translateY(112%);
-  transition: transform 700ms var(--ease-out);
-}
-.has-mask.is-visible .mask-inner{ transform:none; }
-.has-mask .mask-line:nth-child(2) .mask-inner{ transition-delay: 110ms; }
-.has-mask .mask-line:nth-child(3) .mask-inner{ transition-delay: 220ms; }
 
 /* ---------- Woven divider (signature motif) ------------------------------------------
    A hand-woven interlace referencing Meghalaya's living root bridges.

@@ -41,16 +41,6 @@ section{ position:relative; }
   mix-blend-mode: difference;
 }
 .cursor-dot.is-hover{ width:44px; height:44px; background: var(--brass-400); }
-.cursor-dot.is-label{
-  width:64px; height:64px;
-  background: var(--brass-500);
-  color: var(--ink);
-  display:flex; align-items:center; justify-content:center;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing:.1em;
-  mix-blend-mode: normal;
-}
 
 /* ---------- Contour texture (signature ambient background) ---------------------------- */
 .contours{
@@ -252,30 +242,40 @@ section{ position:relative; }
 .why-card p{ color: var(--slate-500); font-size: var(--fs-sm); }
 
 /* ---------- Stats band --------------------------------------------------------------------- */
-.stats{
+/* ---------- Anini Winter Fest ------------------------------------------------------------ */
+.fest{
   background: var(--forest-800);
   background-image: radial-gradient(ellipse at top left, var(--forest-700) 0%, var(--forest-800) 55%);
-  padding-block: var(--sp-7);
-  position:relative; overflow:hidden;
+  padding-block: var(--sp-8);
+  position:relative; overflow:hidden; text-align:center;
 }
-.stats-grid{
-  display:grid; grid-template-columns: repeat(4,1fr);
-  gap: var(--sp-5);
-  text-align:center;
+.fest-badge{
+  display:inline-block; padding: .5em 1.2em; border: 1px solid var(--line-dark);
+  border-radius: 999px; font-family: var(--font-mono); font-size: var(--fs-2xs);
+  letter-spacing:.12em; text-transform:uppercase; color: var(--brass-400); margin-bottom: var(--sp-4);
 }
-.stat b{
-  display:block;
-  font-family: var(--font-display);
-  font-size: var(--fs-4xl);
-  color: var(--mist-050);
-  line-height:1;
+.fest-head h2{ font-size: var(--fs-3xl); color: var(--mist-050); margin-bottom:.2em; }
+.fest-theme{ font-family: var(--font-mono); letter-spacing:.1em; text-transform:uppercase; font-size: var(--fs-xs); color: var(--brass-400); margin-bottom: var(--sp-3); }
+.fest-meta{ display:flex; justify-content:center; flex-wrap:wrap; gap: var(--sp-4); color: rgba(243,246,241,0.75); font-size: var(--fs-sm); margin-bottom: var(--sp-3); }
+.fest-meta i{ color: var(--brass-400); margin-right:.4em; }
+.fest-description{ max-width: 52ch; margin: 0 auto var(--sp-6); color: rgba(243,246,241,0.7); }
+.fest-countdown, .fest-completed{ display:flex; justify-content:center; gap: var(--sp-4); margin-bottom: var(--sp-6); }
+.fest-count{ min-width:72px; }
+.fest-count b{ display:block; font-family: var(--font-display); font-size: var(--fs-3xl); color: var(--mist-050); line-height:1; }
+.fest-count span{ display:block; margin-top:.4em; font-family: var(--font-mono); font-size: var(--fs-2xs); letter-spacing:.1em; text-transform:uppercase; color: var(--brass-400); }
+.fest-completed{ color: var(--brass-400); font-size: var(--fs-md); }
+.fest-completed i{ margin-right: .5em; }
+.fest-experiences{
+  display:grid; grid-template-columns: repeat(5,1fr); gap: var(--sp-3);
+  margin-bottom: var(--sp-6);
 }
-.stat span{
-  display:block; margin-top:.6em;
-  font-family: var(--font-mono); font-size: var(--fs-2xs);
-  letter-spacing:.12em; text-transform:uppercase;
-  color: var(--brass-400);
+.fest-exp{
+  display:flex; flex-direction:column; align-items:center; gap:.6em;
+  padding: var(--sp-3); border-radius: var(--radius-md); background: rgba(243,246,241,0.05);
 }
+.fest-exp i{ font-size: var(--fs-xl); color: var(--brass-400); }
+.fest-exp span{ font-size: var(--fs-2xs); color: rgba(243,246,241,0.85); }
+.fest-ctas{ display:flex; justify-content:center; gap: var(--sp-3); flex-wrap:wrap; }
 
 /* ---------- Packages ------------------------------------------------------------------------ */
 .packages{ padding-block: var(--sp-8); background: var(--mist-050); }
@@ -350,37 +350,15 @@ section{ position:relative; }
   padding: var(--sp-5);
 }
 .lightbox.is-open{ opacity:1; visibility:visible; }
-.lightbox img{
-  max-width:min(900px,90vw); max-height:80vh; border-radius: var(--radius-sm); box-shadow: var(--shadow-lg);
-  transform: scale(0.94); opacity:0;
-  transition: transform var(--dur-med) var(--ease-out), opacity var(--dur-med) var(--ease-out);
-}
-.lightbox.is-open img{ transform:none; opacity:1; }
+.lightbox img{ max-width:min(900px,90vw); max-height:80vh; border-radius: var(--radius-sm); box-shadow: var(--shadow-lg); }
 .lightbox-close{
   position:absolute; top: var(--sp-4); right: var(--sp-4);
   width:44px; height:44px; border-radius:50%;
   color:#fff; font-size:1.1rem;
   display:flex; align-items:center; justify-content:center;
   border: 1px solid var(--line-dark);
-  transition: background var(--dur-fast), color var(--dur-fast);
 }
 .lightbox-close:hover{ background: var(--brass-500); color: var(--ink); }
-.lightbox-nav{
-  position:absolute; top:50%; transform: translateY(-50%);
-  width:48px; height:48px; border-radius:50%;
-  color:#fff; font-size:1.1rem;
-  display:flex; align-items:center; justify-content:center;
-  border: 1px solid var(--line-dark);
-  transition: background var(--dur-fast), color var(--dur-fast), transform var(--dur-fast);
-}
-.lightbox-nav:hover{ background: var(--brass-500); color: var(--ink); }
-.lightbox-prev{ left: var(--sp-4); }
-.lightbox-next{ right: var(--sp-4); }
-@media (max-width:640px){
-  .lightbox-nav{ width:40px; height:40px; }
-  .lightbox-prev{ left: var(--sp-2); }
-  .lightbox-next{ right: var(--sp-2); }
-}
 
 /* ---------- Testimonials ------------------------------------------------------------------------- */
 .testimonials{ padding-block: var(--sp-8); background: var(--mist-050); }
@@ -775,6 +753,7 @@ section{ position:relative; }
    ========================================================================== */
 @media (max-width: 1080px){
   .why-grid{ grid-template-columns: repeat(2,1fr); }
+  .fest-experiences{ grid-template-columns: repeat(3,1fr); }
   .packages-grid{ grid-template-columns: repeat(2,1fr); }
   .rentals-grid{ grid-template-columns: repeat(2,1fr); }
   .footer-grid{ grid-template-columns: 1fr 1fr; }
@@ -794,6 +773,9 @@ section{ position:relative; }
   .nav-burger{ display:flex; }
   .hero-stats{ flex-direction:column; gap: var(--sp-3); }
   .why-grid, .packages-grid, .rentals-grid{ grid-template-columns: 1fr; }
+  .fest-experiences{ grid-template-columns: repeat(2,1fr); }
+  .fest-countdown, .fest-completed{ gap: var(--sp-2); }
+  .fest-count{ min-width:56px; }
   .stats-grid{ grid-template-columns: repeat(2,1fr); gap: var(--sp-5); }
   .footer-grid{ grid-template-columns: 1fr; gap: var(--sp-5); }
   .footer-bottom{ flex-direction:column; align-items:flex-start; }

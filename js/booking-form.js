@@ -35,9 +35,9 @@
       '      </div>' +
       '      <label>Anything else we should know?<textarea name="message" rows="3" maxlength="1000"></textarea></label>' +
       '      <button type="submit" class="btn btn-primary" id="tb-booking-submit">Request Booking</button>' +
-      '      <p class="tb-modal-error" id="tb-booking-error" role="alert"></p>' +
+      '      <p class="tb-modal-error" id="tb-booking-error"></p>' +
       '    </form>' +
-      '    <div class="tb-modal-success" id="tb-booking-success" hidden tabindex="-1">' +
+      '    <div class="tb-modal-success" id="tb-booking-success" hidden>' +
       '      <i class="fas fa-circle-check"></i>' +
       '      <h4>Request received!</h4>' +
       '      <p>We\'ll reach out shortly to confirm details and share a quote. If it\'s urgent, WhatsApp us directly.</p>' +
@@ -60,25 +60,7 @@
 
     document.addEventListener("keydown", function (e) {
       if (e.key === "Escape") closeModal();
-      if (e.key === "Tab" && wrap.classList.contains("is-open")) trapFocus(e);
     });
-  }
-
-  function trapFocus(e) {
-    var modal = document.getElementById(MODAL_ID);
-    var focusable = [].slice.call(
-      modal.querySelectorAll('button, input, textarea, select, a[href]')
-    ).filter(function (el) { return !el.disabled && el.offsetParent !== null; });
-    if (!focusable.length) return;
-    var first = focusable[0];
-    var last = focusable[focusable.length - 1];
-    if (e.shiftKey && document.activeElement === first) {
-      e.preventDefault();
-      last.focus();
-    } else if (!e.shiftKey && document.activeElement === last) {
-      e.preventDefault();
-      first.focus();
-    }
   }
 
   function submitBooking(form) {
@@ -119,9 +101,7 @@
       })
       .then(function () {
         form.hidden = true;
-        var success = document.getElementById("tb-booking-success");
-        success.hidden = false;
-        success.focus();
+        document.getElementById("tb-booking-success").hidden = false;
       })
       .catch(function (err) {
         errorEl.textContent =

@@ -64,7 +64,6 @@
 <body>
 
 <!-- ===================== PRELOADER ===================== -->
-<noscript><style>.loader{ display:none !important; }</style></noscript>
 <div class="loader">
   <svg class="loader-mark" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
     <path d="M10 70 L30 40 L42 55 L58 25 L75 55 L90 70" />
@@ -131,13 +130,6 @@
     <div class="hero-ctas" data-reveal data-reveal-delay="3">
       <a href="https://wa.me/919707386186" target="_blank" class="btn btn-primary"><i class="fa-brands fa-whatsapp"></i> Plan My Trip</a>
       <a href="#packages" class="btn btn-ghost on-dark">View Packages</a>
-    </div>
-
-    <div class="hero-stats glass" data-reveal data-reveal-delay="4">
-      <div class="hero-stat"><b data-count="12" data-suffix="+">0+</b><span>Destinations</span></div>
-      <div class="hero-stat"><b data-count="800" data-suffix="+">0+</b><span>Travelers Guided</span></div>
-      <div class="hero-stat"><b data-count="2025" data-suffix="">0</b><span>Founded In</span></div>
-      <div class="hero-stat"><b data-count="4.9" data-suffix="/5">0/5</b><span>Traveler Rating</span></div>
     </div>
   </div>
   <div class="hero-clip-dots" aria-hidden="true">
@@ -335,17 +327,6 @@
 </section>
 
 <!-- ===================== STATS ===================== -->
-<section class="stats on-dark">
-  <div class="container">
-    <div class="stats-grid">
-      <div class="stat" data-reveal><b data-count="12" data-suffix="+">0</b><span>Destinations Covered</span></div>
-      <div class="stat" data-reveal data-reveal-delay="1"><b data-count="800" data-suffix="+">0</b><span>Happy Travelers</span></div>
-      <div class="stat" data-reveal data-reveal-delay="2"><b data-count="2025" data-suffix="">0</b><span>Founded In</span></div>
-      <div class="stat" data-reveal data-reveal-delay="3"><b data-count="4.9" data-suffix="/5">0</b><span>Average Rating</span></div>
-    </div>
-  </div>
-</section>
-
 <!-- ===================== PACKAGES ===================== -->
 <section class="packages" id="packages">
   <div class="container">
@@ -466,6 +447,45 @@
   </div>
 </section>
 
+<!-- ===================== ANINI WINTER FEST ===================== -->
+<section class="fest on-dark" id="winter-fest">
+  <div class="container">
+    <div class="fest-badge" data-reveal>Offbeat &middot; Untamed &middot; Unforgettable</div>
+    <div class="fest-head" data-reveal data-reveal-delay="1">
+      <h2 id="fest-title">Anini Winter Fest 2026</h2>
+      <p id="fest-theme" class="fest-theme">Music &middot; Adventure &middot; Culture</p>
+      <div class="fest-meta">
+        <span><i class="fa-solid fa-calendar"></i> <span id="fest-dates">19&ndash;20 September 2026</span></span>
+        <span><i class="fa-solid fa-location-dot"></i> <span id="fest-location">Anini, Dibang Valley, Arunachal Pradesh</span></span>
+      </div>
+      <p id="fest-description" class="fest-description">A festival like no other, in the heart of the untamed Dibang Valley.</p>
+    </div>
+
+    <div class="fest-countdown" id="fest-countdown" data-reveal data-reveal-delay="2">
+      <div class="fest-count"><b id="fc-days">00</b><span>Days</span></div>
+      <div class="fest-count"><b id="fc-hours">00</b><span>Hours</span></div>
+      <div class="fest-count"><b id="fc-mins">00</b><span>Mins</span></div>
+      <div class="fest-count"><b id="fc-secs">00</b><span>Secs</span></div>
+    </div>
+    <div class="fest-completed" id="fest-completed" style="display:none;" data-reveal data-reveal-delay="2">
+      <i class="fa-solid fa-circle-check"></i> Event Completed &mdash; thanks for an unforgettable weekend.
+    </div>
+
+    <div class="fest-experiences">
+      <div class="fest-exp" data-reveal data-reveal-delay="1"><i class="fa-solid fa-music"></i><span>Live Music &amp; Artist Performances</span></div>
+      <div class="fest-exp" data-reveal data-reveal-delay="2"><i class="fa-solid fa-campground"></i><span>Camping &amp; Sunset Vibes</span></div>
+      <div class="fest-exp" data-reveal data-reveal-delay="3"><i class="fa-solid fa-motorcycle"></i><span>ATV Rides &amp; Adventure Experiences</span></div>
+      <div class="fest-exp" data-reveal data-reveal-delay="1"><i class="fa-solid fa-mountain-sun"></i><span>Explore Hidden Gems of Dibang Valley</span></div>
+      <div class="fest-exp" data-reveal data-reveal-delay="2"><i class="fa-solid fa-utensils"></i><span>Local Food &amp; Cultural Experiences</span></div>
+    </div>
+
+    <div class="fest-ctas" data-reveal data-reveal-delay="3">
+      <a href="#" id="fest-join-btn" target="_blank" class="btn btn-primary"><i class="fa-brands fa-whatsapp"></i> Join the Festival</a>
+      <a href="#" id="fest-details-btn" target="_blank" class="btn btn-ghost on-dark">Get Festival Details</a>
+    </div>
+  </div>
+</section>
+
 <!-- ===================== RENTALS ===================== -->
 <section class="rentals" id="rentals">
   <div class="container">
@@ -533,20 +553,18 @@
   </div>
 </section>
 
-<div class="lightbox" role="dialog" aria-modal="true" aria-label="Photo viewer">
-  <button class="lightbox-nav lightbox-prev" aria-label="Previous photo"><i class="fa-solid fa-chevron-left"></i></button>
+<div class="lightbox">
   <button class="lightbox-close" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
   <img src="" alt="">
-  <button class="lightbox-nav lightbox-next" aria-label="Next photo"><i class="fa-solid fa-chevron-right"></i></button>
 </div>
 
 <!-- ===================== TESTIMONIALS ===================== -->
 <section class="testimonials" id="reviews">
   <div class="container">
     <div class="section-head centered" data-reveal>
-      <div class="eyebrow">Traveler Notes</div>
-      <h2>What travelers are saying</h2>
-      <p style="font-size:var(--fs-xs); color:var(--slate-300);">Real reviews from real trips &mdash; each one is checked by our team before it appears here.</p>
+      <div class="eyebrow">Traveller Stories</div>
+      <h2>Real journeys. Real memories.</h2>
+      <p style="font-size:var(--fs-xs); color:var(--slate-300);">Every story here comes from a traveler who actually took the trip &mdash; checked by our team before it appears.</p>
     </div>
 
     <div class="t-track-wrap" data-reveal id="t-track-wrap">
