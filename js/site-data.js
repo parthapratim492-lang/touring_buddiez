@@ -51,31 +51,32 @@
   }
 
   function applySettings(s) {
-    // Anini Winter Fest — text content
-    const festMap = {
-      'fest-title': s.event_title, 'fest-theme': s.event_theme,
-      'fest-location': s.event_location, 'fest-description': s.event_description
+    // Update stat counters
+    const statMap = {
+      stat_destinations: 'data-count',
+      stat_travelers: 'data-count',
+      stat_years: 'data-count',
+      stat_rating: 'data-count'
     };
-    Object.entries(festMap).forEach(([id, val]) => {
-      if (val) { const el = document.getElementById(id); if (el) el.textContent = val; }
-    });
-    if (s.event_start_date && s.event_end_date) {
-      const datesEl = document.getElementById('fest-dates');
-      if (datesEl) {
-        const opts = { day: 'numeric', month: 'long', year: 'numeric' };
-        const start = new Date(s.event_start_date + 'T00:00:00');
-        const end = new Date(s.event_end_date + 'T00:00:00');
-        datesEl.textContent = start.toLocaleDateString('en-IN', { day: 'numeric' }) +
-          '–' + end.toLocaleDateString('en-IN', opts);
+    // Update hero stats and main stats section
+    document.querySelectorAll('[data-count]').forEach(el => {
+      const val = parseFloat(el.getAttribute('data-count'));
+      // Match by parent text
+      const parent = el.closest('.stat, .hero-stat');
+      if (!parent) return;
+      const label = parent.querySelector('span')?.textContent?.toLowerCase() || '';
+      // Check the most specific label first: "Traveler Rating" contains the
+      // substring "traveler", so checking that branch before "rating" would
+      // wrongly overwrite the 4.9 rating with the travelers-guided count.
+      if (label.includes('rating') && s.stat_rating) el.setAttribute('data-count', s.stat_rating);
+      else if (label.includes('destination') && s.stat_destinations) el.setAttribute('data-count', s.stat_destinations);
+      else if (label.includes('traveler') || label.includes('happy')) {
+        if (s.stat_travelers) el.setAttribute('data-count', s.stat_travelers);
       }
-      if (window.__initFestCountdown) window.__initFestCountdown(s.event_end_date);
-    }
-    const waNum = s.whatsapp || '919707386186';
-    const joinBtn = document.getElementById('fest-join-btn');
-    const detailsBtn = document.getElementById('fest-details-btn');
-    const festMsg = encodeURIComponent(`Hello Touring Buddiez, I'd like to join ${s.event_title || 'the Anini Winter Fest'}. Please share details.`);
-    if (joinBtn) joinBtn.href = `https://wa.me/${waNum}?text=${festMsg}`;
-    if (detailsBtn) detailsBtn.href = `https://wa.me/${waNum}?text=${festMsg}`;
+      else if (label.includes('founded')) {
+        if (s.stat_years) el.setAttribute('data-count', s.stat_years);
+      }
+    });
 
     // Update contact info
     if (s.phone) {
@@ -214,7 +215,7 @@
       track.innerHTML = `
         <div class="t-empty">
           <i class="fa-regular fa-comment-dots"></i>
-          <p>Your journey could be the next story we share.</p>
+          <p>No reviews yet — be the first traveler to share how your trip went.</p>
         </div>
       `;
       if (dotsEl) dotsEl.innerHTML = '';
@@ -293,9 +294,17 @@
 
   // ─── PACKAGE DETAIL PAGE ───────────────────────────────────────────────────
   async function initPackageDetailPage() {
-    const slug = new URLSearchParams(location.search).get('slug');
+    let slug = new URLSearchParams(location.search).get('slug');
     if (!slug) {
       showDetailError('No package specified.');
+      return;
+    }
+
+    // Kaho used to be its own package; it's now part of the combined
+    // Dong/Tilam/Kaho circuit. Send old bookmarks/links straight there
+    // instead of showing a dead end.
+    if (slug === 'kaho') {
+      location.replace(`package-detail.html?slug=dong${location.hash || ''}`);
       return;
     }
 

@@ -9,6 +9,50 @@ const fs = require('fs');
 const DATA_DIR = process.env.DATA_DIR || __dirname;
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 const DB_PATH = path.join(DATA_DIR, 'touring_buddiez.db');
+
+// ─── Startup integrity check ───────────────────────────────────────────────────
+// A malformed SQLite file crashes the very first PRAGMA call in the old
+// code (`journal_mode = WAL`), which means the process exits nonzero,
+// Render restarts it, it crashes again — an infinite, silent crash loop
+// with the service permanently down and no way for it to recover on its
+// own. This checks the file in isolation *before* opening the real
+// connection, and if it's genuinely unreadable, moves it aside (renamed,
+// never deleted) and lets the schema/seed step below build a fresh
+// database, so the site comes back online instead of crash-looping
+// forever. The corrupt file and its WAL/SHM siblings are preserved next to
+// it with a timestamp, in case they're recoverable later (e.g. via the
+// sqlite3 CLI's `.recover` command from a Render Shell session).
+function quarantineIfCorrupt(dbPath) {
+  if (!fs.existsSync(dbPath)) return; // nothing to check — a fresh DB will be created normally
+  let healthy = false;
+  try {
+    const probe = new Database(dbPath, { readonly: true, fileMustExist: true });
+    const result = probe.pragma('integrity_check');
+    probe.close();
+    healthy = Array.isArray(result) && result.length === 1 && result[0].integrity_check === 'ok';
+  } catch (err) {
+    healthy = false;
+  }
+  if (healthy) return;
+
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  console.error(
+    `[db] FATAL: ${dbPath} failed its integrity check on startup (this is what was ` +
+    `crashing the deploy). Preserving it as *.corrupt-${stamp} rather than deleting it, ` +
+    `and starting a fresh database so the site can come back online. If you need to ` +
+    `recover data from the corrupt file, open a Render Shell and inspect ` +
+    `"${dbPath}.corrupt-${stamp}" with the sqlite3 CLI's ".recover" command.`
+  );
+  [dbPath, `${dbPath}-wal`, `${dbPath}-shm`].forEach((p) => {
+    if (fs.existsSync(p)) {
+      try { fs.renameSync(p, `${p}.corrupt-${stamp}`); }
+      catch (e) { console.error(`[db] Could not move aside ${p}:`, e.message); }
+    }
+  });
+}
+
+quarantineIfCorrupt(DB_PATH);
+
 const db = new Database(DB_PATH);
 
 // Enable WAL mode for better performance
@@ -114,6 +158,8 @@ db.exec(`
     reason TEXT,
     created_at TEXT DEFAULT (datetime('now'))
   );
+
+  CREATE INDEX IF NOT EXISTS idx_availability_slug ON availability(package_slug);
 `);
 
 // ─── Lightweight migration (for DBs created before status/email/created_at existed) ──
@@ -286,64 +332,64 @@ function seed() {
       },
       {
         slug: 'anini',
-        name: 'Anini Expedition',
-        route: 'Dibang Valley · Arunachal Pradesh',
-        duration: '6 Days',
+        name: 'Anini Adventure',
+        route: 'Guwahati · Dibrugarh · Mayodia Pass · Anini',
+        duration: '5 Days / 4 Nights',
         group_size: 'Small groups',
         vehicle: 'Scorpio',
-        price: null,
+        price: '₹16,999/- onwards',
         image_path: 'assets/destinations/anini.jpg',
-        description: "One of India's most remote districts — the Dibang Valley road to Anini takes you through pristine forests, river valleys, and Adi tribal villages.",
+        description: "Five days deep into the Dibang Valley — over Mayodia Pass at 8,000+ ft, through Mishmi villages, to waterfalls and river valley views most travellers never reach. Customizable and extendable.",
         itinerary: JSON.stringify([
-          { day: 1, title: 'Guwahati to Roing', content: 'Long drive to Roing, the gateway to Dibang Valley. Overnight at Roing.' },
-          { day: 2, title: 'Roing to Anini', content: 'Early start. The road to Anini — river crossings, forest tracks, waterfalls.' },
-          { day: 3, title: 'Anini & Dibang Valley', content: 'Explore Anini town and surrounding trails. Dibang river valley walks.' },
-          { day: 4, title: 'Mehao Wildlife Sanctuary', content: 'Drive toward Mehao Lake. Birdwatching and forest walks.' },
-          { day: 5, title: 'Return to Roing', content: 'Drive back. Overnight at Roing.' },
-          { day: 6, title: 'Roing to Guwahati', content: 'Return drive to Guwahati.' }
+          { day: 1, title: 'Guwahati to Dibrugarh', content: 'Pickup from Guwahati airport/station. Scenic drive along the Brahmaputra Valley, past tea gardens and local villages. Evening at leisure, overnight in Dibrugarh.' },
+          { day: 2, title: 'Dibrugarh to Anini via Mayodia Pass', content: 'Early start, crossing the Dibang river and ascending to snowy Mayodia Pass (8,000+ ft) — stop for panoramic views and photography. Descend through Mishmi tribal villages into Anini by evening.' },
+          { day: 3, title: 'Anini Sightseeing', content: "Scenic drive on the raw Bruni Road, riverside time at Chigu Camp, and visits to Matu and Mawu waterfalls with views across the Dri River Valley." },
+          { day: 4, title: 'Anini to Dibrugarh', content: 'Mountain descent with valley views, arriving back in Dibrugarh for an overnight stay.' },
+          { day: 5, title: 'Dibrugarh to Guwahati', content: 'Morning check-out and final travel back to Guwahati for drop-off.' }
         ]),
-        inclusions: JSON.stringify(['4WD vehicle & driver', 'ILP (Inner Line Permit) assistance', 'Transfers throughout', 'Local route planning']),
-        exclusions: JSON.stringify(['ILP fees', 'Hotels & accommodation', 'Meals', 'Personal expenses']),
-        highlights: JSON.stringify(['Dibang river valley', 'Mehao Wildlife Sanctuary', 'Anini — one of India\'s most remote towns', 'Adi tribal culture']),
+        inclusions: JSON.stringify(['Private vehicle', 'Expert driver allowance', 'Stays', 'Sightseeing', 'Inner Line Permit']),
+        exclusions: JSON.stringify(['Meals (unless arranged separately)', 'Personal expenses', 'Travel insurance']),
+        highlights: JSON.stringify(['Mayodia Pass at 8,000+ ft', 'Matu & Mawu waterfalls', 'Dri River Valley views', 'Mishmi tribal villages', 'Customizable & extendable itinerary']),
         route_stops: JSON.stringify([
-          { day: 1, name: 'Guwahati (Pickup)', lat: 26.1445, lng: 91.7362, note: 'Start point.' },
-          { day: 1, name: 'Roing', lat: 28.1409, lng: 95.8394, note: 'Gateway to Dibang Valley.' },
-          { day: 2, name: 'Anini', lat: 28.8167, lng: 95.9333, note: 'River crossings, forest tracks, waterfalls en route.' },
-          { day: 3, name: 'Anini & Dibang Valley', lat: 28.8167, lng: 95.9333, note: 'Local trails and river valley walks.' },
-          { day: 4, name: 'Mehao Wildlife Sanctuary', lat: 28.1897, lng: 95.8536, note: 'Mehao Lake — birdwatching and forest walks.' },
-          { day: 5, name: 'Roing (Return)', lat: 28.1409, lng: 95.8394, note: 'Overnight before the final leg.' },
-          { day: 6, name: 'Guwahati (Drop)', lat: 26.1445, lng: 91.7362, note: 'Trip ends.' }
+          { day: 1, name: 'Guwahati (Pickup)', lat: 26.1445, lng: 91.7362, note: 'Start point — airport/station pickup.' },
+          { day: 1, name: 'Dibrugarh', lat: 27.4728, lng: 94.912, note: 'Scenic Brahmaputra Valley drive; overnight stay.' },
+          { day: 2, name: 'Mayodia Pass', lat: 28.6167, lng: 95.95, note: '8,000+ ft — panoramic views and photography.' },
+          { day: 2, name: 'Anini', lat: 28.8167, lng: 95.9333, note: 'Arrival through Mishmi villages.' },
+          { day: 3, name: 'Anini Sightseeing', lat: 28.8167, lng: 95.9333, note: 'Bruni Road, Chigu Camp, Matu & Mawu waterfalls, Dri River Valley.' },
+          { day: 4, name: 'Dibrugarh (Return)', lat: 27.4728, lng: 94.912, note: 'Mountain descent, overnight stay.' },
+          { day: 5, name: 'Guwahati (Drop)', lat: 26.1445, lng: 91.7362, note: 'Trip ends.' }
         ]),
         featured: 1,
         display_order: 4
       },
       {
         slug: 'dong',
-        name: 'Dong Valley Sunrise',
-        route: 'Dong Valley · Arunachal Pradesh',
-        duration: '5 Days',
+        name: 'Dong, Tilam & Kaho Circuit',
+        route: 'Dong · Tilam · Kibithoo · Kaho · Arunachal Pradesh',
+        duration: '5 Days / 4 Nights',
         group_size: 'Small groups',
         vehicle: 'Scorpio',
-        price: null,
+        price: '₹15,999/- onwards, per person',
         image_path: 'assets/destinations/dong.jpg',
-        description: "Dong village in Anjaw district is the easternmost point of India — famous for being the first place in the country to see the sunrise. A truly off-the-beaten-path expedition.",
+        description: "The far edge of India in one circuit — Dong's sunrise, Tilam's hot spring, Kibithoo (India's last outpost) and Kaho, the country's easternmost inhabited village, on the China border. Travel with a local, experience the real Northeast.",
         itinerary: JSON.stringify([
-          { day: 1, title: 'Guwahati to Tezu', content: 'Drive to Tezu, the base for the Dong Valley route. Overnight.' },
-          { day: 2, title: 'Tezu to Walong', content: 'Drive along the Lohit river to Walong, a scenic border town.' },
-          { day: 3, title: 'Walong to Dong', content: 'The final stretch to Dong village. Pre-dawn preparation for the next morning.' },
-          { day: 4, title: 'Sunrise at Dong', content: 'Wake before dawn to witness India\'s first sunrise. Return to Walong.' },
+          { day: 1, title: 'Guwahati to Tezu', content: 'Long drive day toward Tezu, the last major town before the border road begins. Overnight in Tezu.' },
+          { day: 2, title: 'Tezu to Dong Valley', content: 'Drive along the Lohit river into Dong Valley, timed for its famous sunrise — among the first in India.' },
+          { day: 3, title: 'Dong to Tilam', content: "Continue to Tilam for its hot water spring, then on toward Kibithoo, one of India's easternmost army posts." },
+          { day: 4, title: 'Kibithoo to Kaho', content: "Final stretch to Kaho — India's easternmost inhabited village, with Chinese infrastructure visible across the border." },
           { day: 5, title: 'Return to Guwahati', content: 'Long drive back to Guwahati via Tezu.' }
         ]),
-        inclusions: JSON.stringify(['4WD vehicle & driver', 'ILP permit assistance', 'Transfers', 'Route planning']),
-        exclusions: JSON.stringify(['ILP fees', 'Hotels', 'Meals', 'Personal expenses']),
-        highlights: JSON.stringify(['Easternmost point of India', 'First sunrise in India', 'Lohit river valley', 'Walong war memorial']),
+        inclusions: JSON.stringify(['Transportation (Guwahati to Guwahati)', 'Stays', 'Food', 'Entry fees', 'Guide', 'Inner Line Permits']),
+        exclusions: JSON.stringify(['Personal expenses', 'Travel insurance']),
+        highlights: JSON.stringify(['Dong Valley sunrise', 'Tilam hot water spring', "Kibithoo — India's last village", 'Kaho — the heavenly village, on the China border']),
         route_stops: JSON.stringify([
           { day: 1, name: 'Guwahati (Pickup)', lat: 26.1445, lng: 91.7362, note: 'Start point.' },
-          { day: 1, name: 'Tezu', lat: 27.9167, lng: 96.1667, note: 'Base for the Dong Valley route.' },
-          { day: 2, name: 'Walong', lat: 28.15, lng: 97.0167, note: 'Scenic border town along the Lohit river.' },
-          { day: 3, name: 'Dong Valley', lat: 27.9333, lng: 97.4667, note: 'Final stretch to the village.' },
-          { day: 4, name: 'Dong Sunrise Point', lat: 27.9333, lng: 97.4667, note: "India's first sunrise, before returning to Walong." },
-          { day: 5, name: 'Guwahati (Return)', lat: 26.1445, lng: 91.7362, note: 'Long drive back via Tezu.' }
+          { day: 1, name: 'Tezu', lat: 27.9167, lng: 96.1667, note: 'Last major town before the border road.' },
+          { day: 2, name: 'Dong Valley', lat: 27.9333, lng: 97.4667, note: "Sunrise point — among the first in India." },
+          { day: 3, name: 'Tilam', lat: 27.95, lng: 97.0, note: 'Hot water spring.' },
+          { day: 3, name: 'Kibithoo', lat: 28.28028, lng: 97.01778, note: "India's easternmost army post." },
+          { day: 4, name: 'Kaho', lat: 28.30361, lng: 97.02222, note: 'Easternmost inhabited village — China visible across the river.' },
+          { day: 5, name: 'Guwahati (Return)', lat: 26.1445, lng: 91.7362, note: 'Trip ends.' }
         ]),
         featured: 1,
         display_order: 5
@@ -376,37 +422,54 @@ function seed() {
         display_order: 6
       },
       {
-        slug: 'kaho',
-        name: "Kaho — India's First Village",
-        route: 'Tezu · Hawai · Kibithu · Kaho',
-        duration: '6 Days',
-        group_size: 'Small groups',
-        vehicle: 'Scorpio',
+        slug: 'anini-winter-fest',
+        name: 'Anini Winter Fest 2026',
+        route: 'Anini · Dibang Valley · Arunachal Pradesh',
+        duration: '2 Days / 1 Night',
+        group_size: 'DM for availability',
+        vehicle: '',
         price: null,
-        image_path: 'assets/destinations/kaho.jpg',
-        description: "Kaho, on the India-China border in Anjaw district, is the easternmost inhabited village in the country — reached via a long, spectacular drive along the Lohit river through Tezu, Hawai and Kibithu. One of the most remote expeditions we run.",
+        image_path: 'assets/destinations/anini.jpg',
+        description: "A festival like no other, in the heart of the untamed Dibang Valley — live music, riverside camping, ATV rides and Idu Mishmi culture. 19–20 September 2026, at Anini. DM us for details and itinerary.",
         itinerary: JSON.stringify([
-          { day: 1, title: 'Guwahati to Tezu', content: 'Long drive day toward Tezu, the last major town before the border road begins. Overnight in Tezu.' },
-          { day: 2, title: 'Tezu to Hawai', content: 'Winding mountain roads along the Lohit river to Hawai, the district headquarters of Anjaw.' },
-          { day: 3, title: 'Hawai to Kibithu', content: "Continue deeper along the border road to Kibithu, one of India's easternmost army posts." },
-          { day: 4, title: 'Kibithu to Kaho', content: 'Final stretch to Kaho village on the Lohit river, with Chinese infrastructure visible across the border. Explore the village and checkpost area.' },
-          { day: 5, title: 'Return to Hawai', content: 'Begin the long drive back toward Tezu.' },
-          { day: 6, title: 'Return to Guwahati', content: 'Final leg back to Guwahati.' }
+          { day: 1, title: 'Arrival & Camp', content: 'Arrive at Anini, camp set-up by the riverside. Evening live music and artist performances under the stars.' },
+          { day: 2, title: 'Festival Day', content: 'ATV rides and adventure activities, exploring hidden gems of the Dibang Valley, and local food paired with Idu Mishmi cultural experiences.' }
         ]),
-        inclusions: JSON.stringify(['4WD vehicle & driver', 'ILP (Inner Line Permit) assistance', 'Transfers throughout', "Route planning for one of India's most remote roads"]),
-        exclusions: JSON.stringify(['ILP fees', 'Hotels & homestays', 'Meals', 'Personal expenses']),
-        highlights: JSON.stringify(["India's easternmost inhabited village", 'Views across the India-China border', 'Lohit river valley road', "Declared India's official 'first village' in 2022"]),
+        inclusions: JSON.stringify([]),
+        exclusions: JSON.stringify([]),
+        highlights: JSON.stringify(['Live music & artist performances', 'Camping & sunset vibes by the river', 'ATV rides & adventure activities', 'Idu Mishmi culture & local food', 'Hidden gems of Dibang Valley']),
         route_stops: JSON.stringify([
-          { day: 1, name: 'Guwahati (Pickup)', lat: 26.1445, lng: 91.7362, note: 'Start point.' },
-          { day: 1, name: 'Tezu', lat: 27.9167, lng: 96.1667, note: 'Last major town before the border road.' },
-          { day: 2, name: 'Hawai', lat: 27.88528, lng: 96.81028, note: 'District headquarters of Anjaw.' },
-          { day: 3, name: 'Kibithu', lat: 28.28028, lng: 97.01778, note: "India's easternmost army post." },
-          { day: 4, name: 'Kaho', lat: 28.30361, lng: 97.02222, note: 'Easternmost inhabited village — China visible across the river.' },
-          { day: 5, name: 'Hawai (Return)', lat: 27.88528, lng: 96.81028, note: 'Beginning the return journey.' },
-          { day: 6, name: 'Guwahati (Drop)', lat: 26.1445, lng: 91.7362, note: 'Trip ends.' }
+          { day: 1, name: 'Anini (Festival Venue)', lat: 28.8167, lng: 95.9333, note: 'Arrive, camp set-up, evening live music.' },
+          { day: 2, name: 'Anini (Festival Venue)', lat: 28.8167, lng: 95.9333, note: 'ATV rides, local culture, food, and adventure activities.' }
         ]),
         featured: 1,
         display_order: 7
+      },
+      {
+        slug: 'gongkar-la',
+        name: 'Gongkar La Lake',
+        route: 'Mago · Chuna Valley · Gongkar La · Arunachal Pradesh',
+        duration: '3 Days / 2 Nights',
+        group_size: 'Small groups',
+        vehicle: 'Scorpio',
+        price: '₹7,999/- onwards, per person',
+        image_path: 'assets/destinations/gongkar-la.jpg',
+        description: "A high-altitude 3-day escape to Gongkar La Lake, exploring Mago and Chuna Valley in Arunachal Pradesh.",
+        itinerary: JSON.stringify([
+          { day: 1, title: 'Approach to Mago', content: 'Departure toward Mago, climbing into high-altitude Arunachal terrain.' },
+          { day: 2, title: 'Chuna Valley & Gongkar La Lake', content: 'A full day exploring Chuna Valley and the still waters of Gongkar La Lake.' },
+          { day: 3, title: 'Return Journey', content: 'Drive back, descending out of the high valley.' }
+        ]),
+        inclusions: JSON.stringify([]),
+        exclusions: JSON.stringify([]),
+        highlights: JSON.stringify(['Gongkar La Lake', 'Mago', 'Chuna Valley']),
+        route_stops: JSON.stringify([
+          { day: 1, name: 'Mago', lat: 27.83, lng: 91.98, note: 'High-altitude approach.' },
+          { day: 2, name: 'Chuna Valley & Gongkar La Lake', lat: 27.85, lng: 91.95, note: 'Full day exploring the valley and lake.' },
+          { day: 3, name: 'Return', lat: 27.83, lng: 91.98, note: 'Drive back out of the valley.' }
+        ]),
+        featured: 1,
+        display_order: 8
       }
     ];
 
@@ -478,141 +541,194 @@ function seed() {
 
 seed();
 
-// ─── Content migration: 3 new packages + 2 new rental vehicles ──────────
-// Runs on every boot, but is idempotent — each insert is guarded by a
-// slug/name lookup, so it only adds rows that don't already exist. This
-// is deliberately separate from seed() above, which only ever runs once
-// against a brand-new empty database and would never reach an
-// already-seeded production database like the live site's.
-function migrateNewContent() {
-  const insertPkg = db.prepare(`
-    INSERT INTO packages (slug, name, route, duration, group_size, vehicle, price, image_path, description, itinerary, inclusions, exclusions, highlights, route_stops, featured, display_order)
-    VALUES (@slug, @name, @route, @duration, @group_size, @vehicle, @price, @image_path, @description, @itinerary, @inclusions, @exclusions, @highlights, @route_stops, @featured, @display_order)
-  `);
-  const hasPkg = (slug) => db.prepare('SELECT id FROM packages WHERE slug = ?').get(slug);
+// ─── Content refresh: real flyer data (Sept 2026) ──────────────────────────────
+// Updates 'anini' and 'dong' with the business's current real itineraries/
+// pricing, retires the separate 'kaho' package (now folded into the 'dong'
+// combined circuit), and adds two packages that didn't exist yet
+// ('anini-winter-fest', 'gongkar-la'). seed() only inserts when the whole
+// table is empty, so an already-live database needs this explicit one-time
+// pass instead — guarded by a settings flag so it never re-runs and
+// overwrites anything an admin edits afterward.
+(function migratePackagesContentV2() {
+  const already = db.prepare(`SELECT value FROM settings WHERE key = 'content_migration_v2'`).get();
+  if (already) return;
 
-  const newPackages = [
-    {
-      slug: 'anini-adventure',
-      name: 'Anini Adventure Package',
-      route: 'Guwahati · Dibrugarh · Mayodia Pass · Anini',
-      duration: '5D / 4N',
-      group_size: null,
-      vehicle: null,
-      price: '₹16,999 onwards',
+  const pkgExists = (slug) => db.prepare('SELECT id FROM packages WHERE slug = ?').get(slug);
+
+  if (pkgExists('anini')) {
+    db.prepare(`
+      UPDATE packages SET
+        name = ?, route = ?, duration = ?, price = ?, description = ?,
+        itinerary = ?, inclusions = ?, exclusions = ?, highlights = ?, route_stops = ?
+      WHERE slug = 'anini'
+    `).run(
+      'Anini Adventure',
+      'Guwahati · Dibrugarh · Mayodia Pass · Anini',
+      '5 Days / 4 Nights',
+      '₹16,999/- onwards',
+      "Five days deep into the Dibang Valley — over Mayodia Pass at 8,000+ ft, through Mishmi villages, to waterfalls and river valley views most travellers never reach. Customizable and extendable.",
+      JSON.stringify([
+        { day: 1, title: 'Guwahati to Dibrugarh', content: 'Pickup from Guwahati airport/station. Scenic drive along the Brahmaputra Valley, past tea gardens and local villages. Evening at leisure, overnight in Dibrugarh.' },
+        { day: 2, title: 'Dibrugarh to Anini via Mayodia Pass', content: 'Early start, crossing the Dibang river and ascending to snowy Mayodia Pass (8,000+ ft) — stop for panoramic views and photography. Descend through Mishmi tribal villages into Anini by evening.' },
+        { day: 3, title: 'Anini Sightseeing', content: "Scenic drive on the raw Bruni Road, riverside time at Chigu Camp, and visits to Matu and Mawu waterfalls with views across the Dri River Valley." },
+        { day: 4, title: 'Anini to Dibrugarh', content: 'Mountain descent with valley views, arriving back in Dibrugarh for an overnight stay.' },
+        { day: 5, title: 'Dibrugarh to Guwahati', content: 'Morning check-out and final travel back to Guwahati for drop-off.' }
+      ]),
+      JSON.stringify(['Private vehicle', 'Expert driver allowance', 'Stays', 'Sightseeing', 'Inner Line Permit']),
+      JSON.stringify(['Meals (unless arranged separately)', 'Personal expenses', 'Travel insurance']),
+      JSON.stringify(['Mayodia Pass at 8,000+ ft', 'Matu & Mawu waterfalls', 'Dri River Valley views', 'Mishmi tribal villages', 'Customizable & extendable itinerary']),
+      JSON.stringify([
+        { day: 1, name: 'Guwahati (Pickup)', lat: 26.1445, lng: 91.7362, note: 'Start point — airport/station pickup.' },
+        { day: 1, name: 'Dibrugarh', lat: 27.4728, lng: 94.912, note: 'Scenic Brahmaputra Valley drive; overnight stay.' },
+        { day: 2, name: 'Mayodia Pass', lat: 28.6167, lng: 95.95, note: '8,000+ ft — panoramic views and photography.' },
+        { day: 2, name: 'Anini', lat: 28.8167, lng: 95.9333, note: 'Arrival through Mishmi villages.' },
+        { day: 3, name: 'Anini Sightseeing', lat: 28.8167, lng: 95.9333, note: 'Bruni Road, Chigu Camp, Matu & Mawu waterfalls, Dri River Valley.' },
+        { day: 4, name: 'Dibrugarh (Return)', lat: 27.4728, lng: 94.912, note: 'Mountain descent, overnight stay.' },
+        { day: 5, name: 'Guwahati (Drop)', lat: 26.1445, lng: 91.7362, note: 'Trip ends.' }
+      ])
+    );
+  }
+
+  if (pkgExists('dong')) {
+    db.prepare(`
+      UPDATE packages SET
+        name = ?, route = ?, duration = ?, price = ?, description = ?,
+        itinerary = ?, inclusions = ?, exclusions = ?, highlights = ?, route_stops = ?
+      WHERE slug = 'dong'
+    `).run(
+      'Dong, Tilam & Kaho Circuit',
+      'Dong · Tilam · Kibithoo · Kaho · Arunachal Pradesh',
+      '5 Days / 4 Nights',
+      '₹15,999/- onwards, per person',
+      "The far edge of India in one circuit — Dong's sunrise, Tilam's hot spring, Kibithoo (India's last outpost) and Kaho, the country's easternmost inhabited village, on the China border. Travel with a local, experience the real Northeast.",
+      JSON.stringify([
+        { day: 1, title: 'Guwahati to Tezu', content: 'Long drive day toward Tezu, the last major town before the border road begins. Overnight in Tezu.' },
+        { day: 2, title: 'Tezu to Dong Valley', content: 'Drive along the Lohit river into Dong Valley, timed for its famous sunrise — among the first in India.' },
+        { day: 3, title: 'Dong to Tilam', content: "Continue to Tilam for its hot water spring, then on toward Kibithoo, one of India's easternmost army posts." },
+        { day: 4, title: 'Kibithoo to Kaho', content: "Final stretch to Kaho — India's easternmost inhabited village, with Chinese infrastructure visible across the border." },
+        { day: 5, title: 'Return to Guwahati', content: 'Long drive back to Guwahati via Tezu.' }
+      ]),
+      JSON.stringify(['Transportation (Guwahati to Guwahati)', 'Stays', 'Food', 'Entry fees', 'Guide', 'Inner Line Permits']),
+      JSON.stringify(['Personal expenses', 'Travel insurance']),
+      JSON.stringify(['Dong Valley sunrise', 'Tilam hot water spring', "Kibithoo — India's last village", 'Kaho — the heavenly village, on the China border']),
+      JSON.stringify([
+        { day: 1, name: 'Guwahati (Pickup)', lat: 26.1445, lng: 91.7362, note: 'Start point.' },
+        { day: 1, name: 'Tezu', lat: 27.9167, lng: 96.1667, note: 'Last major town before the border road.' },
+        { day: 2, name: 'Dong Valley', lat: 27.9333, lng: 97.4667, note: "Sunrise point — among the first in India." },
+        { day: 3, name: 'Tilam', lat: 27.95, lng: 97.0, note: 'Hot water spring.' },
+        { day: 3, name: 'Kibithoo', lat: 28.28028, lng: 97.01778, note: "India's easternmost army post." },
+        { day: 4, name: 'Kaho', lat: 28.30361, lng: 97.02222, note: 'Easternmost inhabited village — China visible across the river.' },
+        { day: 5, name: 'Guwahati (Return)', lat: 26.1445, lng: 91.7362, note: 'Trip ends.' }
+      ])
+    );
+  }
+
+  // 'kaho' is now the same trip as the updated 'dong' circuit above —
+  // delete it rather than leave two package pages selling the same route.
+  // No foreign key references this table by slug (bookings/enquiries just
+  // store a text snapshot), so this is safe.
+  db.prepare(`DELETE FROM packages WHERE slug = 'kaho'`).run();
+
+  if (!pkgExists('anini-winter-fest')) {
+    db.prepare(`
+      INSERT INTO packages (slug, name, route, duration, group_size, vehicle, price, image_path, description, itinerary, inclusions, exclusions, highlights, route_stops, featured, display_order)
+      VALUES (@slug, @name, @route, @duration, @group_size, @vehicle, @price, @image_path, @description, @itinerary, @inclusions, @exclusions, @highlights, @route_stops, @featured, @display_order)
+    `).run({
+      slug: 'anini-winter-fest',
+      name: 'Anini Winter Fest 2026',
+      route: 'Anini · Dibang Valley · Arunachal Pradesh',
+      duration: '2 Days / 1 Night',
+      group_size: 'DM for availability',
+      vehicle: '',
+      price: null,
       image_path: 'assets/destinations/anini.jpg',
-      description: 'An offbeat adventure into the remote and breathtaking Dibang Valley — over Mayodia Pass and through Mishmi villages to Anini, one of the least-visited corners of Arunachal Pradesh. Pickup and drop in Guwahati. Customizable and extendable.',
+      description: "A festival like no other, in the heart of the untamed Dibang Valley — live music, riverside camping, ATV rides and Idu Mishmi culture. 19–20 September 2026, at Anini. DM us for details and itinerary.",
       itinerary: JSON.stringify([
-        { day: 1, title: 'Guwahati to Dibrugarh', content: 'Pickup from Guwahati airport/station, drive through the Brahmaputra Valley past tea gardens and local villages, arrive in Dibrugarh by evening.' },
-        { day: 2, title: 'Dibrugarh to Anini via Mayodia Pass', content: 'Early departure, cross the Dibang River, ascend to Mayodia Pass, descend through Mishmi tribal villages, reach Anini by evening.' },
-        { day: 3, title: "Anini Sightseeing — Nature's Masterpiece", content: 'Scenic drive on Bruni Road, Chigu Camp by the riverside, Roaring Matu Waterfall, Hidden Mawu Waterfall, and views over the Dri River Valley.' },
-        { day: 4, title: 'Anini to Dibrugarh', content: 'Mountain descent, valley views, overnight stay in Dibrugarh.' },
-        { day: 5, title: 'Dibrugarh to Guwahati', content: 'Morning checkout and the final drive back to Guwahati, with onward flight connections.' }
-      ]),
-      inclusions: JSON.stringify(['Private vehicle', 'Expert driver allowance', 'Stays', 'Sightseeing', 'Inner Line Permit']),
-      exclusions: JSON.stringify(['Meals & personal expenses', 'Anything not listed in inclusions']),
-      highlights: JSON.stringify(['Mayodia Pass', 'Mishmi tribal villages', 'Roaring Matu Waterfall', 'Hidden Mawu Waterfall', 'Dri River Valley views']),
-      route_stops: JSON.stringify([
-        { day: 1, name: 'Guwahati (Pickup)', lat: 26.1445, lng: 91.7362, note: 'Airport / railway station pickup.' },
-        { day: 1, name: 'Dibrugarh', lat: 27.4728, lng: 94.9120, note: 'Overnight stay.' },
-        { day: 2, name: 'Mayodia Pass', lat: 28.4642, lng: 95.9376, note: '~8,000+ ft — panoramic photography stops.' },
-        { day: 2, name: 'Anini', lat: 28.8167, lng: 95.8167, note: 'Dibang Valley — check-in.' }
-      ]),
-      featured: 1, display_order: 100
-    },
-    {
-      slug: 'dong-tilam-kibithoo-kaho',
-      name: 'Dong — Hidden Paradise of Arunachal',
-      route: 'Guwahati · Dong · Tilam · Kibithoo · Kaho',
-      duration: '5D / 4N',
-      group_size: null,
-      vehicle: null,
-      price: '₹15,999 onwards / person',
-      image_path: 'assets/destinations/dong.jpg',
-      description: "Explore the hidden paradise of Eastern Arunachal Pradesh — Dong's sunrise, Tilam's hot spring, and India's last villages at Kibithoo and Kaho. Travel with a local, experience the real Northeast.",
-      itinerary: JSON.stringify([
-        { day: 1, title: 'Guwahati to Dong', content: 'Journey into Eastern Arunachal Pradesh toward Dong Valley.' },
-        { day: 2, title: 'Dong Valley Sunrise', content: 'Among the first places in India to see the sunrise.' },
-        { day: 3, title: 'Tilam', content: "Visit Tilam's hot water spring." },
-        { day: 4, title: 'Kibithoo & Kaho', content: "Kibithoo — India's last village — and Kaho, the heavenly village, past Kibithu." },
-        { day: 5, title: 'Return to Guwahati', content: 'Drive back to Guwahati.' }
-      ]),
-      inclusions: JSON.stringify(['Transportation', 'Stays', 'Food', 'Entry fees', 'Guide', 'Inner Line Permits']),
-      exclusions: JSON.stringify(['Personal expenses', 'Anything not listed in inclusions']),
-      highlights: JSON.stringify(['Dong Valley Sunrise', 'Tilam Hot Water Spring', "Kibithoo — India's Last Village", 'Kaho — The Heavenly Village']),
-      route_stops: JSON.stringify([
-        { day: 1, name: 'Guwahati (Pickup)', lat: 26.1445, lng: 91.7362, note: 'Start of the journey.' },
-        { day: 2, name: 'Dong', lat: 28.15, lng: 97.05, note: 'Sunrise point.' },
-        { day: 3, name: 'Tilam', lat: 28.16, lng: 97.02, note: 'Hot water spring.' },
-        { day: 4, name: 'Kibithoo', lat: 29.15, lng: 97.43, note: "India's last village." },
-        { day: 4, name: 'Kaho', lat: 29.17, lng: 97.45, note: 'The heavenly village.' }
-      ]),
-      featured: 1, display_order: 110
-    },
-    {
-      slug: 'gongkar-la-lake',
-      name: 'Gongkar La Lake',
-      route: 'Mago · Chuna Valley · Gongkar La',
-      duration: '3D / 2N',
-      group_size: null,
-      vehicle: null,
-      price: '₹7,999',
-      image_path: 'assets/hero/poster.jpg',
-      description: 'A high-altitude Arunachal adventure around Gongkar La Lake, exploring Mago and Chuna Valley — scenic mountain landscapes and one of the region\'s least-visited alpine routes.',
-      itinerary: JSON.stringify([
-        { day: 1, title: 'Depart for Mago', content: 'Journey into the Mago region of Arunachal Pradesh.' },
-        { day: 2, title: 'Chuna Valley & Gongkar La Lake', content: 'Explore Chuna Valley and visit Gongkar La Lake.' },
-        { day: 3, title: 'Return Journey', content: 'Drive back, journey ends.' }
+        { day: 1, title: 'Arrival & Camp', content: 'Arrive at Anini, camp set-up by the riverside. Evening live music and artist performances under the stars.' },
+        { day: 2, title: 'Festival Day', content: 'ATV rides and adventure activities, exploring hidden gems of the Dibang Valley, and local food paired with Idu Mishmi cultural experiences.' }
       ]),
       inclusions: JSON.stringify([]),
       exclusions: JSON.stringify([]),
-      highlights: JSON.stringify(['Mago', 'Chuna Valley', 'Gongkar La Lake', 'High-altitude photography']),
+      highlights: JSON.stringify(['Live music & artist performances', 'Camping & sunset vibes by the river', 'ATV rides & adventure activities', 'Idu Mishmi culture & local food', 'Hidden gems of Dibang Valley']),
       route_stops: JSON.stringify([
-        { day: 1, name: 'Mago', lat: 27.83, lng: 91.60, note: 'Remote Tawang district village.' },
-        { day: 2, name: 'Chuna Valley', lat: 27.85, lng: 91.62, note: '' },
-        { day: 2, name: 'Gongkar La Lake', lat: 27.87, lng: 91.65, note: 'High-altitude alpine lake.' }
+        { day: 1, name: 'Anini (Festival Venue)', lat: 28.8167, lng: 95.9333, note: 'Arrive, camp set-up, evening live music.' },
+        { day: 2, name: 'Anini (Festival Venue)', lat: 28.8167, lng: 95.9333, note: 'ATV rides, local culture, food, and adventure activities.' }
       ]),
-      featured: 1, display_order: 120
-    }
-  ];
-
-  for (const pkg of newPackages) {
-    if (!hasPkg(pkg.slug)) insertPkg.run(pkg);
+      featured: 1,
+      display_order: 7
+    });
   }
 
-  // Rentals — new self-drive vehicles from the current promotional material
+  if (!pkgExists('gongkar-la')) {
+    db.prepare(`
+      INSERT INTO packages (slug, name, route, duration, group_size, vehicle, price, image_path, description, itinerary, inclusions, exclusions, highlights, route_stops, featured, display_order)
+      VALUES (@slug, @name, @route, @duration, @group_size, @vehicle, @price, @image_path, @description, @itinerary, @inclusions, @exclusions, @highlights, @route_stops, @featured, @display_order)
+    `).run({
+      slug: 'gongkar-la',
+      name: 'Gongkar La Lake',
+      route: 'Mago · Chuna Valley · Gongkar La · Arunachal Pradesh',
+      duration: '3 Days / 2 Nights',
+      group_size: 'Small groups',
+      vehicle: 'Scorpio',
+      price: '₹7,999/- onwards, per person',
+      image_path: 'assets/destinations/gongkar-la.jpg',
+      description: "A high-altitude 3-day escape to Gongkar La Lake, exploring Mago and Chuna Valley in Arunachal Pradesh.",
+      itinerary: JSON.stringify([
+        { day: 1, title: 'Approach to Mago', content: 'Departure toward Mago, climbing into high-altitude Arunachal terrain.' },
+        { day: 2, title: 'Chuna Valley & Gongkar La Lake', content: 'A full day exploring Chuna Valley and the still waters of Gongkar La Lake.' },
+        { day: 3, title: 'Return Journey', content: 'Drive back, descending out of the high valley.' }
+      ]),
+      inclusions: JSON.stringify([]),
+      exclusions: JSON.stringify([]),
+      highlights: JSON.stringify(['Gongkar La Lake', 'Mago', 'Chuna Valley']),
+      route_stops: JSON.stringify([
+        { day: 1, name: 'Mago', lat: 27.83, lng: 91.98, note: 'High-altitude approach.' },
+        { day: 2, name: 'Chuna Valley & Gongkar La Lake', lat: 27.85, lng: 91.95, note: 'Full day exploring the valley and lake.' },
+        { day: 3, name: 'Return', lat: 27.83, lng: 91.98, note: 'Drive back out of the valley.' }
+      ]),
+      featured: 1,
+      display_order: 8
+    });
+  }
+
+  db.prepare(`INSERT OR REPLACE INTO settings (key, value) VALUES ('content_migration_v2', datetime('now'))`).run();
+})();
+
+// ─── Content refresh: new self-drive rentals (Sept 2026) ───────────────────────
+(function migrateRentalsContentV2() {
+  const already = db.prepare(`SELECT value FROM settings WHERE key = 'rentals_migration_v2'`).get();
+  if (already) return;
+
+  const rentalExists = (name) => db.prepare('SELECT id FROM rentals WHERE name = ?').get(name);
   const insertRental = db.prepare(`
     INSERT INTO rentals (name, seats, tags, image_path, whatsapp, display_order)
     VALUES (@name, @seats, @tags, @image_path, @whatsapp, @display_order)
   `);
-  const hasRental = (name) => db.prepare('SELECT id FROM rentals WHERE name = ?').get(name);
+  const rentalCount = db.prepare('SELECT COUNT(*) as c FROM rentals').get().c;
 
-  const newRentals = [
-    { name: 'Hyundai i20 N Line (Self-Drive)', seats: '5', tags: JSON.stringify([{ icon: 'fa-key', label: 'Self-drive' }, { icon: 'fa-car', label: 'Hatchback' }]), image_path: 'assets/rentals/i20-selfdrive.jpg', whatsapp: '919707386186', display_order: 5 },
-    { name: 'Mahindra Thar (Self-Drive)', seats: '4', tags: JSON.stringify([{ icon: 'fa-key', label: 'Self-drive' }, { icon: 'fa-mountain', label: 'Off-road SUV' }]), image_path: 'assets/rentals/thar-selfdrive.jpg', whatsapp: '919707386186', display_order: 6 }
-  ];
-
-  for (const r of newRentals) {
-    if (!hasRental(r.name)) insertRental.run(r);
+  if (!rentalExists('Hyundai i20 (Self-Drive)')) {
+    insertRental.run({
+      name: 'Hyundai i20 (Self-Drive)',
+      seats: '5',
+      tags: JSON.stringify([{ icon: 'fa-car', label: 'Hatchback' }, { icon: 'fa-key', label: 'Self-drive' }]),
+      image_path: 'assets/rentals/i20-selfdrive.jpg',
+      whatsapp: '919707386186',
+      display_order: rentalCount + 1
+    });
+  }
+  if (!rentalExists('Mahindra Thar Roxx (Self-Drive)')) {
+    insertRental.run({
+      name: 'Mahindra Thar Roxx (Self-Drive)',
+      seats: '5',
+      tags: JSON.stringify([{ icon: 'fa-mountain', label: 'SUV' }, { icon: 'fa-key', label: 'Self-drive' }]),
+      image_path: 'assets/rentals/thar-roxx-selfdrive.jpg',
+      whatsapp: '919707386186',
+      display_order: rentalCount + 2
+    });
   }
 
-  // Winter Fest event defaults — only set if the admin hasn't configured
-  // these yet, so an already-live site's edits are never overwritten.
-  const hasSetting = (key) => db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
-  const setIfMissing = db.prepare('INSERT INTO settings (key, value) VALUES (?, ?)');
-  const eventDefaults = [
-    ['event_title', 'Anini Winter Fest 2026'],
-    ['event_theme', 'Music · Adventure · Culture'],
-    ['event_start_date', '2026-09-19'],
-    ['event_end_date', '2026-09-20'],
-    ['event_location', 'Anini, Dibang Valley, Arunachal Pradesh'],
-    ['event_description', 'A festival like no other, in the heart of the untamed Dibang Valley.']
-  ];
-  for (const [key, value] of eventDefaults) {
-    if (!hasSetting(key)) setIfMissing.run(key, value);
-  }
-}
-migrateNewContent();
+  db.prepare(`INSERT OR REPLACE INTO settings (key, value) VALUES ('rentals_migration_v2', datetime('now'))`).run();
+})();
 
 // ─── Query helpers ─────────────────────────────────────────────────────────────
 
@@ -783,5 +899,9 @@ module.exports = {
       mostBookedPackage: mostBookedPackage ? mostBookedPackage.package_name : null,
       bookingsByDay, packagePopularity, recentActivity
     };
-  }
+  },
+
+  // Exposed so server.js can checkpoint WAL and close the file handle
+  // cleanly on shutdown, instead of leaving the process to be killed mid-write.
+  close: () => db.close()
 };
