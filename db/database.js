@@ -523,16 +523,12 @@ function seed() {
   if (settingCount === 0) {
     const insertSetting = db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');
     [
-      ['phone', '+91 60028 16370'],
+      ['phone', '+91 97073 86186'],
       ['phone_raw', '+919707386186'],
       ['whatsapp', '919707386186'],
       ['instagram', 'touring_buddiez'],
       ['facebook', '#'],
       ['base_location', 'Guwahati, Assam'],
-      ['stat_destinations', '12'],
-      ['stat_travelers', '800'],
-      ['stat_years', '2025'],
-      ['stat_rating', '4.9'],
       ['site_description', 'Curated tours and reliable car rentals across Northeast India, based in Guwahati, Assam.'],
       ['response_time', 'usually within the hour']
     ].forEach(([k, v]) => insertSetting.run(k, v));
@@ -695,6 +691,22 @@ seed();
 })();
 
 // ─── Content refresh: new self-drive rentals (Sept 2026) ───────────────────────
+// ─── Fix: 'phone' setting didn't match 'phone_raw' in earlier seeds ────────────
+// A past seed set phone_raw to the current number but left the human-readable
+// 'phone' display value on an old one — anywhere that showed 'phone' directly
+// was showing the wrong number. One-time correction, guarded so it never
+// stomps a phone number an admin has since typed in themselves.
+(function migratePhoneSettingV2() {
+  const already = db.prepare(`SELECT value FROM settings WHERE key = 'phone_migration_v2'`).get();
+  if (already) return;
+
+  const current = db.prepare(`SELECT value FROM settings WHERE key = 'phone'`).get();
+  if (current && current.value === '+91 60028 16370') {
+    db.prepare(`UPDATE settings SET value = ? WHERE key = 'phone'`).run('+91 97073 86186');
+  }
+  db.prepare(`INSERT OR REPLACE INTO settings (key, value) VALUES ('phone_migration_v2', datetime('now'))`).run();
+})();
+
 (function migrateRentalsContentV2() {
   const already = db.prepare(`SELECT value FROM settings WHERE key = 'rentals_migration_v2'`).get();
   if (already) return;

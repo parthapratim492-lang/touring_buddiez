@@ -238,43 +238,6 @@
   }
 
   /* ---------------------------------------------------------------------
-     5. STAT COUNTERS
-  --------------------------------------------------------------------- */
-  function initCounters() {
-    const counters = document.querySelectorAll("[data-count]");
-    if (!counters.length) return;
-
-    const animate = (el) => {
-      const target = parseFloat(el.dataset.count);
-      const suffix = el.dataset.suffix || "";
-      const decimals = el.dataset.count.includes(".") ? el.dataset.count.split(".")[1].length : 0;
-      const duration = 1600;
-      const start = performance.now();
-      const step = (now) => {
-        const p = Math.min((now - start) / duration, 1);
-        const eased = 1 - Math.pow(1 - p, 3);
-        el.textContent = (target * eased).toFixed(decimals) + suffix;
-        if (p < 1) requestAnimationFrame(step);
-      };
-      if (reduceMotion) el.textContent = target.toFixed(decimals) + suffix;
-      else requestAnimationFrame(step);
-    };
-
-    const obs = new IntersectionObserver(
-      (entries, o) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            animate(entry.target);
-            o.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0.6 }
-    );
-    counters.forEach((c) => obs.observe(c));
-  }
-
-  /* ---------------------------------------------------------------------
      6. 3D TILT CARDS
   --------------------------------------------------------------------- */
   function initTilt() {
@@ -371,11 +334,13 @@
       return;
     }
 
-    let current = 0;
-    const dots = document.querySelectorAll(".hero-clip-dots span");
+    const dots = document.querySelectorAll(".hero-clip-dots button");
 
     const activate = (i) => {
-      videos.forEach((v, vi) => v.classList.toggle("is-active", vi === i));
+      videos.forEach((v, vi) => {
+        v.classList.toggle("is-active", vi === i);
+        if (vi !== i) v.pause();
+      });
       dots.forEach((d, di) => d.classList.toggle("is-active", di === i));
       const next = videos[(i + 1) % videos.length];
       if (next.preload === "none") next.preload = "auto";
@@ -386,9 +351,14 @@
 
     videos.forEach((v, i) => {
       v.addEventListener("ended", () => {
-        current = (i + 1) % videos.length;
-        activate(current);
+        v.currentTime = 0; // rewind so this clip is ready to play again next cycle
+        activate((i + 1) % videos.length);
       });
+    });
+
+    // Dots double as a manual scrubber — a click jumps straight to that clip.
+    dots.forEach((d, i) => {
+      d.addEventListener("click", () => activate(i));
     });
 
     activate(0);
@@ -695,7 +665,6 @@
     initCursor();
     initReveal();
     initMaskReveal();
-    initCounters();
     initTilt();
     initRipple();
     initMagnetic();

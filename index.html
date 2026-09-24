@@ -109,13 +109,13 @@
 <!-- ===================== HERO ===================== -->
 <section class="hero" id="home">
   <div class="hero-media" id="hero-media">
-    <video class="hero-video is-active" autoplay muted loop playsinline preload="auto" poster="assets/hero/poster.jpg" data-index="0">
+    <video class="hero-video is-active" autoplay muted playsinline preload="auto" poster="assets/hero/poster.jpg" data-index="0">
       <source src="assets/hero/video/hero1.mp4" type="video/mp4">
     </video>
-    <video class="hero-video" muted loop playsinline preload="none" data-index="1">
+    <video class="hero-video" muted playsinline preload="none" data-index="1">
       <source src="assets/hero/video/hero2.mp4" type="video/mp4">
     </video>
-    <video class="hero-video" muted loop playsinline preload="none" data-index="2">
+    <video class="hero-video" muted playsinline preload="none" data-index="2">
       <source src="assets/hero/video/hero3.mp4" type="video/mp4">
     </video>
     <img class="hero-fallback" src="assets/hero/poster.jpg" alt="Misty hills of Northeast India">
@@ -132,16 +132,11 @@
       <a href="https://wa.me/919707386186" target="_blank" class="btn btn-primary"><i class="fa-brands fa-whatsapp"></i> Plan My Trip</a>
       <a href="#packages" class="btn btn-ghost on-dark">View Packages</a>
     </div>
-
-    <div class="hero-stats glass" data-reveal data-reveal-delay="4">
-      <div class="hero-stat"><b data-count="12" data-suffix="+">0+</b><span>Destinations</span></div>
-      <div class="hero-stat"><b data-count="800" data-suffix="+">0+</b><span>Travelers Guided</span></div>
-      <div class="hero-stat"><b data-count="2025" data-suffix="">0</b><span>Founded In</span></div>
-      <div class="hero-stat"><b data-count="4.9" data-suffix="/5">0/5</b><span>Traveler Rating</span></div>
-    </div>
   </div>
-  <div class="hero-clip-dots" aria-hidden="true">
-    <span class="is-active"></span><span></span><span></span>
+  <div class="hero-clip-dots">
+    <button type="button" class="is-active" aria-label="Show clip 1"></button>
+    <button type="button" aria-label="Show clip 2"></button>
+    <button type="button" aria-label="Show clip 3"></button>
   </div>
   <div class="scroll-cue"><span>SCROLL</span><span class="scroll-cue-line"></span></div>
 </section>
@@ -334,14 +329,35 @@
   </div>
 </section>
 
-<!-- ===================== STATS ===================== -->
-<section class="stats on-dark">
+<!-- ===================== TRAVEL GUIDE ===================== -->
+<section class="guide on-dark" id="guide">
   <div class="container">
-    <div class="stats-grid">
-      <div class="stat" data-reveal><b data-count="12" data-suffix="+">0</b><span>Destinations Covered</span></div>
-      <div class="stat" data-reveal data-reveal-delay="1"><b data-count="800" data-suffix="+">0</b><span>Happy Travelers</span></div>
-      <div class="stat" data-reveal data-reveal-delay="2"><b data-count="2025" data-suffix="">0</b><span>Founded In</span></div>
-      <div class="stat" data-reveal data-reveal-delay="3"><b data-count="4.9" data-suffix="/5">0</b><span>Average Rating</span></div>
+    <div class="section-head centered" data-reveal>
+      <div class="eyebrow">Know Before You Go</div>
+      <h2>What each region actually requires</h2>
+      <p>Permits, seasons and altitude &mdash; the practical side of planning a trip out here, handled for you.</p>
+    </div>
+    <div class="guide-grid">
+      <div class="guide-card" data-reveal data-reveal-delay="1">
+        <i class="fa-solid fa-id-card"></i>
+        <h3>Meghalaya &amp; Sikkim</h3>
+        <p>No permit needed for Indian nationals across most of the Meghalaya circuit. In Sikkim, Nathula and parts of North Sikkim need a Protected Area Permit &mdash; we arrange it as part of the trip.</p>
+      </div>
+      <div class="guide-card" data-reveal data-reveal-delay="2">
+        <i class="fa-solid fa-file-shield"></i>
+        <h3>Arunachal Pradesh</h3>
+        <p>An Inner Line Permit is mandatory for every Indian visitor to Anini, Dong, Ziro, Kaho and Gongkar La. Paperwork is handled before you set out, not at the checkpost.</p>
+      </div>
+      <div class="guide-card" data-reveal data-reveal-delay="3">
+        <i class="fa-solid fa-passport"></i>
+        <h3>Bhutan</h3>
+        <p>Indian nationals cross with a valid passport or voter ID &mdash; no visa required. A Sustainable Development Fee applies at the border, payable on arrival.</p>
+      </div>
+      <div class="guide-card" data-reveal data-reveal-delay="1">
+        <i class="fa-solid fa-cloud-sun"></i>
+        <h3>Best Time to Travel</h3>
+        <p>October to April gives the clearest roads and mountain views. June to September is monsoon &mdash; higher passes can close on short notice after heavy rain.</p>
+      </div>
     </div>
   </div>
 </section>

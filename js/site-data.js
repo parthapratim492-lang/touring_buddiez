@@ -51,33 +51,6 @@
   }
 
   function applySettings(s) {
-    // Update stat counters
-    const statMap = {
-      stat_destinations: 'data-count',
-      stat_travelers: 'data-count',
-      stat_years: 'data-count',
-      stat_rating: 'data-count'
-    };
-    // Update hero stats and main stats section
-    document.querySelectorAll('[data-count]').forEach(el => {
-      const val = parseFloat(el.getAttribute('data-count'));
-      // Match by parent text
-      const parent = el.closest('.stat, .hero-stat');
-      if (!parent) return;
-      const label = parent.querySelector('span')?.textContent?.toLowerCase() || '';
-      // Check the most specific label first: "Traveler Rating" contains the
-      // substring "traveler", so checking that branch before "rating" would
-      // wrongly overwrite the 4.9 rating with the travelers-guided count.
-      if (label.includes('rating') && s.stat_rating) el.setAttribute('data-count', s.stat_rating);
-      else if (label.includes('destination') && s.stat_destinations) el.setAttribute('data-count', s.stat_destinations);
-      else if (label.includes('traveler') || label.includes('happy')) {
-        if (s.stat_travelers) el.setAttribute('data-count', s.stat_travelers);
-      }
-      else if (label.includes('founded')) {
-        if (s.stat_years) el.setAttribute('data-count', s.stat_years);
-      }
-    });
-
     // Update contact info
     if (s.phone) {
       document.querySelectorAll('a[href^="tel:"]').forEach(el => {
