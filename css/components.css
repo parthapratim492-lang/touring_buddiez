@@ -231,6 +231,8 @@ h1,h2,h3,h4{ font-family: var(--font-display); line-height: var(--lh-tight); fon
   background: var(--ink);
   color: var(--brass-400);
 }
+.badge-muted{ background: rgba(11,29,21,0.75); color: var(--slate-300); }
+.badge-live{ background: var(--rust-500); color: var(--mist-050); }
 
 /* ---------- Navigation --------------------------------------------------------- */
 .nav{

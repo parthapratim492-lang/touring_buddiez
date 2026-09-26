@@ -84,6 +84,9 @@ db.exec(`
     exclusions TEXT DEFAULT '[]',
     highlights TEXT DEFAULT '[]',
     route_stops TEXT DEFAULT '[]',
+    event_status TEXT,
+    event_start_date TEXT,
+    event_end_date TEXT,
     featured INTEGER DEFAULT 0,
     display_order INTEGER DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now'))
@@ -175,6 +178,13 @@ db.exec(`
   const cols = db.prepare(`PRAGMA table_info(packages)`).all().map(c => c.name);
   if (!cols.includes('route_stops')) db.exec(`ALTER TABLE packages ADD COLUMN route_stops TEXT DEFAULT '[]'`);
   if (!cols.includes('price')) db.exec(`ALTER TABLE packages ADD COLUMN price TEXT`);
+  // NULL for an ordinary always-bookable package; 'upcoming' | 'completed' |
+  // 'cancelled' for a dated one-off event (a festival, a fixed-date trip).
+  // Only packages that are genuinely tied to a specific date range use this —
+  // it decides whether the site shows a live booking CTA or a past-event one.
+  if (!cols.includes('event_status')) db.exec(`ALTER TABLE packages ADD COLUMN event_status TEXT`);
+  if (!cols.includes('event_start_date')) db.exec(`ALTER TABLE packages ADD COLUMN event_start_date TEXT`);
+  if (!cols.includes('event_end_date')) db.exec(`ALTER TABLE packages ADD COLUMN event_end_date TEXT`);
 
   // Backfill route stops for the 5 built-in destinations on databases that
   // already existed before this feature shipped (seed() only inserts rows
@@ -229,10 +239,49 @@ db.exec(`
 // ─── Seed ─────────────────────────────────────────────────────────────────────
 
 function seed() {
-  const hasAdmin = db.prepare('SELECT id FROM admin_users WHERE username = ?').get('admin');
+  // Checks for *any* existing admin account, not specifically one named
+  // "admin" — ADMIN_USERNAME below can set a custom username, and this
+  // must still recognize that account as already existing on every
+  // subsequent boot (otherwise it would keep trying to insert a duplicate
+  // and crash on the table's unique constraint).
+  const hasAdmin = db.prepare('SELECT id, username, password_hash FROM admin_users LIMIT 1').get();
   if (!hasAdmin) {
-    const hash = bcrypt.hashSync('admin123', 10);
-    db.prepare('INSERT INTO admin_users (username, password_hash) VALUES (?, ?)').run('admin', hash);
+    // Read the real admin credentials from the environment instead of the
+    // hardcoded admin/admin123 this used to ship with — .env.example already
+    // documented ADMIN_USERNAME/ADMIN_PASSWORD as if they did this; they
+    // didn't actually get read anywhere until now.
+    const envUsername = process.env.ADMIN_USERNAME;
+    const envPassword = process.env.ADMIN_PASSWORD;
+
+    if (process.env.NODE_ENV === 'production' && !envPassword) {
+      console.error(
+        '\n[FATAL] No admin account exists yet and ADMIN_PASSWORD is not set. ' +
+        'Refusing to create one with a predictable default password in production. ' +
+        'Set ADMIN_USERNAME and ADMIN_PASSWORD in your environment and restart.\n'
+      );
+      process.exit(1);
+    }
+
+    const username = envUsername || 'admin';
+    const password = envPassword || 'admin123'; // dev-only fallback — never reached in production, see above
+    if (!envPassword) {
+      console.warn(`[db] No ADMIN_PASSWORD set — seeding a dev-only default account (${username}/admin123). Set ADMIN_PASSWORD before deploying.`);
+    }
+    const hash = bcrypt.hashSync(password, 10);
+    db.prepare('INSERT INTO admin_users (username, password_hash) VALUES (?, ?)').run(username, hash);
+  } else if (process.env.NODE_ENV === 'production') {
+    // An admin account already exists (e.g. from before this fix). Warn
+    // loudly on every boot if it's still sitting on the well-known default
+    // password, since that's exactly the credential pair this whole check
+    // exists to rule out — but don't touch it automatically, since the
+    // owner may be relying on it to log in right now. Change it from the
+    // admin panel's "Change Password" screen.
+    if (bcrypt.compareSync('admin123', hasAdmin.password_hash || '')) {
+      console.warn(
+        '\n[SECURITY WARNING] The admin account is still using the default password. ' +
+        'Log in and change it immediately from the admin panel.\n'
+      );
+    }
   }
 
   const pkgCount = db.prepare('SELECT COUNT(*) as c FROM packages').get().c;
@@ -742,6 +791,26 @@ seed();
   db.prepare(`INSERT OR REPLACE INTO settings (key, value) VALUES ('rentals_migration_v2', datetime('now'))`).run();
 })();
 
+// ─── Event dates for fixed-date packages ───────────────────────────────────────
+// Anini Winter Fest and Ziro Fest are actual dated events, not evergreen
+// itineraries — set their real dates once so parseJSON()'s event_status
+// logic (above) can tell, on every request, whether each one is still
+// upcoming or has already happened. Deliberately NOT wired into the shared
+// createPackage/updatePackage admin functions — admin.js doesn't have a UI
+// for these two fields yet, and adding the columns to that generic bind
+// would break every other package edit until it does.
+(function migrateEventDatesV1() {
+  const already = db.prepare(`SELECT value FROM settings WHERE key = 'event_dates_migration_v1'`).get();
+  if (already) return;
+
+  db.prepare(`UPDATE packages SET event_start_date = ?, event_end_date = ? WHERE slug = 'anini-winter-fest'`)
+    .run('2026-09-19', '2026-09-20');
+  db.prepare(`UPDATE packages SET event_start_date = ?, event_end_date = ? WHERE slug = 'ziro-fest'`)
+    .run('2026-09-24', '2026-09-26');
+
+  db.prepare(`INSERT OR REPLACE INTO settings (key, value) VALUES ('event_dates_migration_v1', datetime('now'))`).run();
+})();
+
 // ─── Query helpers ─────────────────────────────────────────────────────────────
 
 function parseJSON(row) {
@@ -751,6 +820,22 @@ function parseJSON(row) {
       try { row[field] = JSON.parse(row[field]); } catch { row[field] = []; }
     }
   });
+  // Derive a live event_status for anything with event dates (a festival, a
+  // fixed-date departure) rather than trusting a status someone set once and
+  // forgot about. An explicit 'cancelled' always wins — that's a business
+  // decision, not something today's date can tell us. Otherwise: past the
+  // end date is 'completed', within range is 'ongoing', still ahead is
+  // 'upcoming'. A package with no event dates at all just isn't an event —
+  // event_status stays null and the site treats it as a normal, always-
+  // bookable trip.
+  if (row.event_end_date) {
+    if (row.event_status !== 'cancelled') {
+      const today = new Date().toISOString().slice(0, 10);
+      if (today > row.event_end_date) row.event_status = 'completed';
+      else if (row.event_start_date && today >= row.event_start_date) row.event_status = 'ongoing';
+      else row.event_status = 'upcoming';
+    }
+  }
   return row;
 }
 

@@ -75,6 +75,44 @@ app.get(Object.keys(LEGACY_PACKAGE_REDIRECTS), (req, res) => {
   res.redirect(301, `/package-detail.html?slug=${slug}`);
 });
 
+// ─── Dynamic sitemap ────────────────────────────────────────────────────────
+// Generated from the actual database on every request instead of a
+// hand-maintained static file, so a removed/renamed package (Kaho, folded
+// into the Dong circuit) can never leave a dead URL sitting in the sitemap
+// indefinitely — the URL list here always matches what the site currently
+// serves. Registered ahead of express.static below so it isn't shadowed by
+// a leftover sitemap.xml file on disk.
+app.get('/sitemap.xml', (req, res) => {
+  try {
+    const base = `${req.protocol}://${req.get('host')}`;
+    const today = new Date().toISOString().slice(0, 10);
+    const packages = db.getAllPackages();
+
+    const urls = [
+      { loc: `${base}/`, changefreq: 'weekly', priority: '1.0' },
+      { loc: `${base}/packages.html`, changefreq: 'weekly', priority: '0.9' },
+      { loc: `${base}/index.html#rentals`, changefreq: 'monthly', priority: '0.7' },
+      { loc: `${base}/index.html#gallery`, changefreq: 'monthly', priority: '0.6' },
+      { loc: `${base}/index.html#reviews`, changefreq: 'weekly', priority: '0.6' },
+      { loc: `${base}/index.html#guide`, changefreq: 'monthly', priority: '0.6' },
+      { loc: `${base}/index.html#contact`, changefreq: 'monthly', priority: '0.6' },
+      ...packages.map(p => ({
+        loc: `${base}/package-detail.html?slug=${p.slug}`,
+        changefreq: p.event_status === 'completed' ? 'yearly' : 'monthly',
+        priority: p.event_status === 'completed' ? '0.4' : '0.8'
+      }))
+    ];
+
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
+      urls.map(u => `  <url>\n    <loc>${u.loc}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>${u.changefreq}</changefreq>\n    <priority>${u.priority}</priority>\n  </url>`).join('\n') +
+      `\n</urlset>`;
+
+    res.type('application/xml').send(xml);
+  } catch (err) {
+    res.status(500).type('text/plain').send('Sitemap temporarily unavailable');
+  }
+});
+
 app.use(express.static(__dirname));
 app.use('/uploads', express.static(UPLOADS_DIR));
 

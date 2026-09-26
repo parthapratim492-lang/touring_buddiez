@@ -26,6 +26,47 @@
     return '★'.repeat(Math.max(1, Math.min(5, n || 5)));
   }
 
+  // A package with event dates is a one-off (a festival, a fixed departure)
+  // rather than an always-bookable itinerary — the badge and CTA need to
+  // reflect whether it's actually still ahead of us.
+  function eventBadgeHtml(p) {
+    if (p.event_status === 'completed') return '<span class="badge badge-muted">Completed</span>';
+    if (p.event_status === 'cancelled') return '<span class="badge badge-muted">Cancelled</span>';
+    if (p.event_status === 'ongoing') return '<span class="badge badge-live">Happening now</span>';
+    return `<span class="badge">${esc(p.duration || '')}</span>`;
+  }
+  function isClosedEvent(p) {
+    return p.event_status === 'completed' || p.event_status === 'cancelled';
+  }
+  // A contextual WhatsApp opener beats one generic message reused
+  // everywhere — pre-fills the package name and leaves clear blanks for
+  // dates/travellers so the visitor's message already tells us what we need
+  // to quote them, instead of "Hi, I want to book."
+  function buildPackageWhatsAppMessage(pkg) {
+    return `Hi Touring Buddiez,\nI'd like to enquire about the ${pkg.name}.\n\nTravel dates:\nTravellers:\n\nPlease share availability and the final quote.`;
+  }
+  function buildRentalWhatsAppMessage(rental) {
+    return `Hi Touring Buddiez,\nI'd like to enquire about the ${rental.name}.\n\nPickup:\nReturn:\nDates:\n\nPlease share availability and pricing.`;
+  }
+
+  function pkgActionsHtml(p) {
+    const mapBtn = (p.route_stops && p.route_stops.length)
+      ? `<a href="package-detail.html?slug=${esc(p.slug)}#pkg-route-map" class="btn btn-ghost btn-sm btn-map" aria-label="View route map" title="View route map"><i class="fa-solid fa-map-location-dot"></i></a>`
+      : '';
+    if (isClosedEvent(p)) {
+      // No live booking CTA on a trip that already happened — send interest
+      // toward the gallery/story or a WhatsApp "ask about next time" instead.
+      return `
+        <a href="package-detail.html?slug=${esc(p.slug)}" class="btn btn-ghost btn-sm">View Story</a>
+        <a href="index.html#gallery" class="btn btn-ghost btn-sm">See Gallery</a>
+      `;
+    }
+    return `
+      <a href="package-detail.html?slug=${esc(p.slug)}" class="btn btn-dark btn-sm">View Details</a>
+      ${mapBtn}
+    `;
+  }
+
   // ─── Page detection ────────────────────────────────────────────────────────
   const page = document.body.dataset.page || (
     location.pathname.includes('packages.html') ? 'packages' :
@@ -100,19 +141,18 @@
       <article class="pkg-card card tilt" data-reveal${i > 0 ? ` data-reveal-delay="${i % 3}"` : ''}>
         <div class="media-zoom">
           <img src="/${p.image_path}" alt="${esc(p.name)}" onerror="this.src='assets/hero/poster.jpg'">
-          <span class="badge">${esc(p.duration || '')}</span>
+          ${eventBadgeHtml(p)}
         </div>
         <div class="pkg-body">
           <div class="pkg-route">${esc(p.route || '')}</div>
           <h3>${esc(p.name)}</h3>
-          ${p.price ? `<div class="pkg-price">${esc(p.price)}</div>` : ''}
+          ${p.price && !isClosedEvent(p) ? `<div class="pkg-price">${esc(p.price)}</div>` : ''}
           <div class="pkg-meta">
             ${p.group_size ? `<span><i class="fa-solid fa-users"></i> ${esc(p.group_size)}</span>` : ''}
             ${p.vehicle ? `<span><i class="fa-solid fa-car"></i> ${esc(p.vehicle)}</span>` : ''}
           </div>
           <div class="pkg-actions">
-            <a href="package-detail.html?slug=${esc(p.slug)}" class="btn btn-dark btn-sm">View Details</a>
-            ${(p.route_stops && p.route_stops.length) ? `<a href="package-detail.html?slug=${esc(p.slug)}#pkg-route-map" class="btn btn-ghost btn-sm btn-map" aria-label="View route map" title="View route map"><i class="fa-solid fa-map-location-dot"></i></a>` : ''}
+            ${pkgActionsHtml(p)}
           </div>
         </div>
       </article>
@@ -135,12 +175,13 @@
   }
 
   function renderRentals(rentals, settings) {
-    const grid = document.querySelector('.rentals-grid');
-    if (!grid || !rentals || !rentals.length) return;
+    const wrap = document.getElementById('rentals-content');
+    if (!wrap || !rentals || !rentals.length) return;
 
     const whatsapp = settings?.whatsapp || '919707386186';
+    const isSelfDrive = (r) => Array.isArray(r.tags) && r.tags.some(t => String(t.label || t).toLowerCase().includes('self-drive'));
 
-    grid.innerHTML = rentals.map((r, i) => {
+    const cardHtml = (r, i) => {
       const tags = Array.isArray(r.tags) ? r.tags : [];
       return `
         <article class="veh-card card tilt" data-reveal${i > 0 ? ` data-reveal-delay="${i % 4}"` : ''}>
@@ -152,11 +193,25 @@
             <div class="veh-tags">
               ${tags.map(t => `<span><i class="fa-solid ${esc(t.icon || 'fa-check')}"></i> ${esc(t.label || t)}</span>`).join('')}
             </div>
-            <a href="https://wa.me/${r.whatsapp || whatsapp}" target="_blank" class="btn btn-dark btn-sm" style="width:100%;">Book Now</a>
+            <a href="https://wa.me/${r.whatsapp || whatsapp}?text=${encodeURIComponent(buildRentalWhatsAppMessage(r))}" target="_blank" class="btn btn-dark btn-sm" style="width:100%;">Book Now</a>
           </div>
         </article>
       `;
-    }).join('');
+    };
+
+    const withDriver = rentals.filter(r => !isSelfDrive(r));
+    const selfDrive = rentals.filter(isSelfDrive);
+
+    let html = '';
+    if (withDriver.length) {
+      html += `<div class="rentals-subhead" data-reveal><i class="fa-solid fa-user-tie"></i> With Driver</div>
+        <div class="rentals-grid">${withDriver.map(cardHtml).join('')}</div>`;
+    }
+    if (selfDrive.length) {
+      html += `<div class="rentals-subhead" data-reveal><i class="fa-solid fa-key"></i> Self Drive</div>
+        <div class="rentals-grid">${selfDrive.map(cardHtml).join('')}</div>`;
+    }
+    wrap.innerHTML = html;
 
     if (window.__reinitReveals) window.__reinitReveals();
   }
@@ -237,19 +292,18 @@
       <article class="pkg-card card tilt" data-reveal${i > 0 ? ` data-reveal-delay="${i % 4}"` : ''}>
         <div class="media-zoom">
           <img src="/${p.image_path}" alt="${esc(p.name)}" onerror="this.src='assets/hero/poster.jpg'">
-          <span class="badge">${esc(p.duration || '')}</span>
+          ${eventBadgeHtml(p)}
         </div>
         <div class="pkg-body">
           <div class="pkg-route">${esc(p.route || '')}</div>
           <h3>${esc(p.name)}</h3>
-          ${p.price ? `<div class="pkg-price">${esc(p.price)}</div>` : ''}
+          ${p.price && !isClosedEvent(p) ? `<div class="pkg-price">${esc(p.price)}</div>` : ''}
           <div class="pkg-meta">
             ${p.group_size ? `<span><i class="fa-solid fa-users"></i> ${esc(p.group_size)}</span>` : ''}
             ${p.vehicle ? `<span><i class="fa-solid fa-car"></i> ${esc(p.vehicle)}</span>` : ''}
           </div>
           <div class="pkg-actions">
-            <a href="package-detail.html?slug=${esc(p.slug)}" class="btn btn-dark btn-sm">View Details</a>
-            ${(p.route_stops && p.route_stops.length) ? `<a href="package-detail.html?slug=${esc(p.slug)}#pkg-route-map" class="btn btn-ghost btn-sm btn-map" aria-label="View route map" title="View route map"><i class="fa-solid fa-map-location-dot"></i></a>` : ''}
+            ${pkgActionsHtml(p)}
           </div>
         </div>
       </article>
@@ -454,6 +508,7 @@
             </div>
           ` : ''}
 
+          ${!isClosedEvent(pkg) ? `
           <div class="pkg-availability-section">
             <h2>Availability</h2>
             <p class="pkg-availability-intro">Dates shown in red are already blocked — everything else is open. Get in touch to lock in your preferred dates.</p>
@@ -461,6 +516,7 @@
               <div class="pkg-route-map-loading"><i class="fa-solid fa-spinner fa-spin"></i> Checking availability&hellip;</div>
             </div>
           </div>
+          ` : ''}
 
           ${incl.length ? `
             <h2>What's Usually Included</h2>
@@ -482,19 +538,30 @@
         </div>
 
         <div class="pkg-detail-sidebar">
-          <h3>Interested in this trip?</h3>
-          ${pkg.price ? `<div class="pkg-price pkg-price-lg">${esc(pkg.price)}</div>` : ''}
-          <p>${pkg.price
-            ? "Seats are limited and fill up fast — reach out on WhatsApp or send a booking request to lock in your spot."
-            : "Send us your dates and group size on WhatsApp and we'll put together a proper quote — no fixed package price, no guesswork."}</p>
-          <button type="button" class="btn btn-primary" onclick="TBBooking.open({packageSlug:'${esc(pkg.slug)}', packageName:'${esc(pkg.name).replace(/'/g, "\\'")}'})">
-            <i class="fa-solid fa-calendar-check"></i> Book This Trip
-          </button>
-          <a href="https://wa.me/${whatsapp}?text=Hi%2C%20I'm%20interested%20in%20the%20${encodeURIComponent(pkg.name)}%20package" target="_blank" class="btn btn-dark">
-            <i class="fa-brands fa-whatsapp"></i> Enquire on WhatsApp
-          </a>
-          <a href="index.html#contact" class="btn btn-ghost">Send An Enquiry</a>
-          <p class="pkg-sidebar-note">Response usually within a few hours</p>
+          ${isClosedEvent(pkg) ? `
+            <h3>${pkg.event_status === 'completed' ? 'This event has concluded' : 'This event was cancelled'}</h3>
+            <p>${pkg.event_status === 'completed'
+              ? "Thanks to everyone who joined us. Want to know when the next one is announced?"
+              : "This date didn't go ahead. Get in touch and we'll let you know about future dates."}</p>
+            <a href="index.html#gallery" class="btn btn-dark"><i class="fa-solid fa-images"></i> See the Gallery</a>
+            <a href="https://wa.me/${whatsapp}?text=${encodeURIComponent(`Hi Touring Buddiez, I'd like to know when ${pkg.name} happens next.`)}" target="_blank" class="btn btn-ghost">
+              <i class="fa-brands fa-whatsapp"></i> Ask About Next Time
+            </a>
+          ` : `
+            <h3>Interested in this trip?</h3>
+            ${pkg.price ? `<div class="pkg-price pkg-price-lg">${esc(pkg.price)}</div>` : ''}
+            <p>${pkg.price
+              ? "Seats are limited and fill up fast — reach out on WhatsApp or send a booking request to lock in your spot."
+              : "Send us your dates and group size on WhatsApp and we'll put together a proper quote — no fixed package price, no guesswork."}</p>
+            <button type="button" class="btn btn-primary" onclick="TBBooking.open({packageSlug:'${esc(pkg.slug)}', packageName:'${esc(pkg.name).replace(/'/g, "\\'")}'})">
+              <i class="fa-solid fa-calendar-check"></i> Book This Trip
+            </button>
+            <a href="https://wa.me/${whatsapp}?text=${encodeURIComponent(buildPackageWhatsAppMessage(pkg))}" target="_blank" class="btn btn-dark">
+              <i class="fa-brands fa-whatsapp"></i> Enquire on WhatsApp
+            </a>
+            <a href="index.html#contact" class="btn btn-ghost">Send An Enquiry</a>
+            <p class="pkg-sidebar-note">Response usually within a few hours</p>
+          `}
         </div>
       </div>
     `;
@@ -508,7 +575,7 @@
       });
     }
 
-    renderAvailabilityCalendar(pkg.slug);
+    if (!isClosedEvent(pkg)) renderAvailabilityCalendar(pkg.slug);
   }
 
   async function renderAvailabilityCalendar(slug) {

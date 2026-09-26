@@ -289,6 +289,12 @@ section{ position:relative; }
 /* ---------- Vehicles ------------------------------------------------------------------------- */
 .rentals{ padding-block: var(--sp-8); background: var(--paper); }
 .rentals-grid{ display:grid; grid-template-columns: repeat(4,1fr); gap: var(--sp-4); }
+.rentals-subhead{
+  display:flex; align-items:center; gap:.5em;
+  font-family: var(--font-mono); font-size: var(--fs-xs); letter-spacing:.08em; text-transform:uppercase;
+  color: var(--brass-600); margin: var(--sp-6) 0 var(--sp-4);
+}
+.rentals-subhead:first-of-type{ margin-top: var(--sp-5); }
 .veh-card{ overflow:hidden; }
 .veh-card .media-zoom{ aspect-ratio: 4/3; }
 .veh-card .media-zoom img{ width:100%; height:100%; object-fit:cover; }
